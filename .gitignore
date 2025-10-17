@@ -83,4 +83,13 @@ Random_File_Names_Key*
 test_output.wav
 demo_stimulus.wav
 Hearing_Tinnitus_Estimation_Stimuli_*.mp4
+Tin_Mod_File_*.wav
 Tin_Mod_File_*.mp4
+
+# Generated experimental stimuli files
+noise_FB*_*.wav
+amp_FB*_*.wav
+phase_FB*_*.wav
+test_noise_FB*_*.wav
+test_amp_FB*_*.wav
+test_phase_FB*_*.wav

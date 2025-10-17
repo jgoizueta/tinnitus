@@ -82,7 +82,7 @@ def test_stimulus_generation():
     print("Testing stimulus generation...")
 
     # Test create_example_stimulus
-    stim = create_example_stimulus(f0=150, mod_type='amp', duration=0.1,
+    stim = create_example_stimulus(f0=9185, mod_type='amp', duration=0.1,
                                   output_filename='test_output.wav')
 
     assert len(stim) > 0, "Generated stimulus should not be empty"

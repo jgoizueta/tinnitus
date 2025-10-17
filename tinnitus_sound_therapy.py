@@ -343,6 +343,185 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
     return stim_out
 
 
+def generate_full_experiment_stimuli_updated(loud: float = 0.1, files_per_category: int = 1,
+                                           randnames: bool = False, name_key_file: str = 'Random_File_Names_Key') -> None:
+    """
+    Generate full set of experimental stimuli used in online tinnitus modulation study
+
+    Updated version that matches the latest MatLab implementation (September 2024)
+    This script exactly recreates stimuli used in original published trial of online therapy
+
+    Args:
+        loud: loudness scaling factor (default: 0.1) - needs optimizing
+        files_per_category: number of files per category (default: 1) - higher number reduces repetitiveness
+        randnames: whether to use random file names (default: False) - set to True for final rollout
+        name_key_file: filename for the randomization key (default: 'Random_File_Names_Key')
+
+    William Sedley - Last updated September 2024
+    """
+    srate = 44100
+    mod_type = ['noise', 'amp', 'phase']
+    dur_range = [4, 4]
+    ramp_prop = 0.25
+    f0_range = [96, 256]
+    n_per_file = 900  # 60 minutes exactly
+
+    # Frequency bands setup - exactly matching MatLab
+    fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
+    fbands = [[fb[i], fb[i+1]] for i in range(8)]  # 8 frequency bands
+
+    fhz = 1000 * (2 ** np.arange(0, 4.25, 0.25))
+    hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
+    hl_corr_temp_fbands = hl_corr_temp[1::2]  # Every second element starting from index 1
+
+    hl_corr_vals = [0, 15, 30, 45]  # Maximum (dB) correction difference between 8 kHz and 1 kHz
+    hl_corr_labels = ['NH', 'MildHL', 'ModHL', 'SevHL']
+
+    if randnames:
+        ntot = len(mod_type) * (len(fbands) - 1) * len(hl_corr_vals) * files_per_category
+        rnames = np.random.permutation(ntot) + 1  # +1 to match MatLab 1-indexing
+        file_key = []
+
+    print(f"Generating experimental stimuli...")
+    print(f"Total files to generate: {len(mod_type) * (len(fbands) - 1) * len(hl_corr_vals) * files_per_category}")
+    print(f"This will take some time...")
+
+    file_count = 0
+    total_files = len(mod_type) * (len(fbands) - 1) * len(hl_corr_vals) * files_per_category
+
+    for m in range(len(mod_type)):
+        for b in range(len(fbands) - 1):  # -1 because we use pairs of adjacent bands
+            for h in range(len(hl_corr_vals)):
+                for f in range(files_per_category):
+                    fname_tmp = f"{mod_type[m]}_FB{b+1}_{hl_corr_labels[h]}_{f+1}.wav"
+
+                    if randnames:
+                        ntmp = rnames[0]
+                        rnames = rnames[1:]
+                        rname_tmp = f"Tin_Mod_File_{ntmp}.wav"
+                        file_key.append([fname_tmp, rname_tmp])
+
+                    stim = []
+                    for s in range(n_per_file):
+                        dur_tmp = np.round(10 * (min(dur_range) + np.random.rand() * np.diff(dur_range)[0])) / 10
+                        f0_tmp = int(np.round(min(f0_range) + np.random.rand() * np.diff(f0_range)[0]))
+                        fband_db = hl_corr_temp_fbands * hl_corr_vals[h]
+                        fband_mod = [b, b + 1]  # Use adjacent frequency bands
+
+                        stim_tmp = mod_ripple(
+                            f0=f0_tmp,
+                            rand_phase=0,
+                            dur=dur_tmp,
+                            loud=loud,
+                            ramp=dur_tmp * ramp_prop,
+                            tmr=1,
+                            smr=[1.5, 7.5],  # Updated SMR values
+                            scyc=8,
+                            fbands=fbands,
+                            fbanddb=fband_db.tolist(),
+                            fband_mod=fband_mod,
+                            mod_type=mod_type[m],
+                            normfreq=0
+                        )
+                        stim.extend(stim_tmp)
+
+                    stim = np.array(stim)
+                    maxabs = np.max(np.abs(stim))
+                    if maxabs > 1:
+                        stim = stim / maxabs
+                        print('Downscaling to prevent clipping.')
+
+                    if randnames:
+                        sf.write(rname_tmp, stim, srate)
+                        print(f"Generated: {rname_tmp}")
+                    else:
+                        sf.write(fname_tmp, stim, srate)
+                        print(f"Generated: {fname_tmp}")
+
+                    file_count += 1
+                    print(f"Progress: {file_count}/{total_files} files completed")
+
+    if randnames:
+        np.save(name_key_file, file_key)
+        print(f"Randomization key saved to: {name_key_file}.npy")
+
+    print("Full experimental stimuli generation completed!")
+
+
+def test_experimental_stimuli_generation(n_per_file: int = 2) -> None:
+    """
+    Test version of experimental stimuli generation with minimal parameters
+
+    Args:
+        n_per_file: number of stimuli per file (default: 2 for testing)
+    """
+    print("Testing experimental stimuli generation (minimal version)...")
+
+    srate = 44100
+    mod_type = ['noise', 'amp']  # Test only 2 types
+    dur_range = [0.5, 0.5]  # Shorter duration
+    ramp_prop = 0.25
+    f0_range = [150, 150]  # Fixed frequency
+    loud = 0.1
+
+    # Frequency bands setup - reduced set
+    fb = 1000 * (2 ** np.arange(0, 2.5, 0.5))  # Only up to 4 kHz
+    fbands = [[fb[i], fb[i+1]] for i in range(4)]  # 4 bands: 1-1.4, 1.4-2, 2-2.8, 2.8-4 kHz
+
+    fhz = 1000 * (2 ** np.arange(0, 2.25, 0.25))
+    hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 1.25, 0.25)]) / 2
+    hl_corr_temp_fbands = hl_corr_temp[1::2][:len(fbands)]  # Match fbands length
+
+    hl_corr_vals = [0, 15]  # Only 2 hearing loss conditions
+    hl_corr_labels = ['NH', 'MildHL']
+
+    total_files = len(mod_type) * (len(fbands) - 1) * len(hl_corr_vals)
+    print(f"Will generate {total_files} test files...")
+
+    file_count = 0
+
+    for m in range(len(mod_type)):
+        for b in range(len(fbands) - 1):
+            for h in range(len(hl_corr_vals)):
+                fname_tmp = f"test_{mod_type[m]}_FB{b+1}_{hl_corr_labels[h]}.wav"
+
+                stim = []
+                for s in range(n_per_file):
+                    dur_tmp = np.round(10 * (min(dur_range) + np.random.rand() * np.diff(dur_range)[0])) / 10
+                    f0_tmp = int(np.round(min(f0_range) + np.random.rand() * np.diff(f0_range)[0]))
+                    fband_db = hl_corr_temp_fbands[:len(fbands)] * hl_corr_vals[h]
+                    fband_mod = [b, b + 1]
+
+                    stim_tmp = mod_ripple(
+                        f0=f0_tmp,
+                        rand_phase=0,
+                        dur=dur_tmp,
+                        loud=loud,
+                        ramp=dur_tmp * ramp_prop,
+                        tmr=1,
+                        smr=[1.5, 7.5],
+                        scyc=8,
+                        fbands=fbands,
+                        fbanddb=fband_db.tolist(),
+                        fband_mod=fband_mod,
+                        mod_type=mod_type[m],
+                        normfreq=0
+                    )
+                    stim.extend(stim_tmp)
+
+                stim = np.array(stim)
+                maxabs = np.max(np.abs(stim))
+                if maxabs > 1:
+                    stim = stim / maxabs
+                    print('Downscaling to prevent clipping.')
+
+                sf.write(fname_tmp, stim, srate)
+                file_count += 1
+                print(f"Generated: {fname_tmp} ({file_count}/{total_files})")
+
+    print(f"Test generation completed! Generated {file_count} files.")
+
+
 def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int = 1,
                                    randnames: bool = True, name_key_file: str = 'Random_File_Names_Key') -> None:
     """
@@ -536,8 +715,13 @@ def main():
     create_example_stimulus(f0=150, mod_type='noise', output_filename='noise_modulation_example.wav')
 
     print("\nExample stimuli created successfully!")
-    print("\nTo generate full experimental stimuli (WARNING: creates many files):")
+    print("\nTo generate experimental stimuli:")
+    print("# Test version (minimal files for testing):")
+    print("test_experimental_stimuli_generation(n_per_file=2)")
+    print("# Full version - Original:")
     print("generate_full_experiment_stimuli(files_per_category=1)")
+    print("# Full version - Updated (matches latest MatLab Sept 2024):")
+    print("generate_full_experiment_stimuli_updated(files_per_category=1, randnames=False)")
     print("\nTo generate hearing estimation stimuli:")
     print("generate_hearing_tinnitus_estimation_stimuli()")
 
