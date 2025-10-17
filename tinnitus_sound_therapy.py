@@ -501,7 +501,7 @@ def create_example_stimulus(f0: float = 150, mod_type: str = 'amp', duration: fl
     return stimulus
 
 
-if __name__ == "__main__":
+def main():
     """
     Example usage of the tinnitus sound therapy functions
     """
@@ -520,3 +520,7 @@ if __name__ == "__main__":
     print("generate_full_experiment_stimuli(files_per_category=1)")
     print("\nTo generate hearing estimation stimuli:")
     print("generate_hearing_tinnitus_estimation_stimuli()")
+
+
+if __name__ == "__main__":
+    main()
