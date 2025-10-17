@@ -157,6 +157,19 @@ def generate_hearing_assessment_stimuli(output_dir: str = ".",
     zvec = np.zeros(int(stim_dur * srate))  # Silent interval
     bw_mults = 2 ** (np.array([-0.5, 0.5]) * bw)
 
+    # Validate file format and adjust if needed
+    supported_formats = ['wav', 'flac', 'ogg']
+    if file_format == 'mp4':
+        if verbose:
+            print("Warning: MP4 format not supported by Python soundfile library.")
+            print("Converting to WAV format for compatibility.")
+        file_format = 'wav'
+    elif file_format not in supported_formats:
+        if verbose:
+            print(f"Warning: Format '{file_format}' may not be supported.")
+            print(f"Supported formats: {', '.join(supported_formats)}")
+            print("Proceeding with requested format...")
+
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
@@ -247,7 +260,7 @@ def main():
 Examples:
   %(prog)s                          # Generate in current directory
   %(prog)s -o hearing_stimuli       # Generate in specific directory
-  %(prog)s -f mp4 --quiet           # Generate MP4 files without progress
+  %(prog)s -f flac --quiet          # Generate FLAC files without progress
   %(prog)s --help                   # Show this help message
 
 Output files:
@@ -268,9 +281,9 @@ Each file contains 17 test frequencies from 1-16 kHz in 1/4 octave steps.
 
     parser.add_argument(
         "-f", "--format",
-        choices=["wav", "mp4"],
+        choices=["wav", "flac", "ogg", "mp4"],
         default="wav",
-        help="Audio file format (default: wav)"
+        help="Audio file format (default: wav). Note: mp4 will be converted to wav due to library limitations."
     )
 
     parser.add_argument(

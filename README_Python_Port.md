@@ -118,8 +118,8 @@ python hearing_assessment_stimuli.py
 # Generate in specific directory
 python hearing_assessment_stimuli.py -o hearing_tests
 
-# Generate MP4 format quietly
-python hearing_assessment_stimuli.py -f mp4 --quiet
+# Generate FLAC format quietly (MP4 not supported, auto-converts to WAV)
+python hearing_assessment_stimuli.py -f flac --quiet
 
 # Show help
 python hearing_assessment_stimuli.py --help
