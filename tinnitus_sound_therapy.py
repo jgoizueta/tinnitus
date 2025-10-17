@@ -465,7 +465,7 @@ def generate_hearing_tinnitus_estimation_stimuli() -> None:
             sf.write(filename, stim_all, srate)
 
 
-def create_example_stimulus(f0: float = 9185, mod_type: str = 'amp', duration: float = 4.0,
+def create_example_stimulus(f0: float = 150, mod_type: str = 'amp', duration: float = 4.0,
                           output_filename: str = 'example_tinnitus_stimulus.wav') -> np.ndarray:
     """
     Create a simple example tinnitus therapy stimulus
@@ -531,9 +531,9 @@ def main():
     # Create example stimuli with different modulation types
     print("Creating example stimuli...")
 
-    create_example_stimulus(f0=9185, mod_type='amp', output_filename='amplitude_modulation_example.wav')
-    create_example_stimulus(f0=9185, mod_type='phase', output_filename='phase_modulation_example.wav')
-    create_example_stimulus(f0=9185, mod_type='noise', output_filename='noise_modulation_example.wav')
+    create_example_stimulus(f0=150, mod_type='amp', output_filename='amplitude_modulation_example.wav')
+    create_example_stimulus(f0=150, mod_type='phase', output_filename='phase_modulation_example.wav')
+    create_example_stimulus(f0=150, mod_type='noise', output_filename='noise_modulation_example.wav')
 
     print("\nExample stimuli created successfully!")
     print("\nTo generate full experimental stimuli (WARNING: creates many files):")
