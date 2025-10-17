@@ -33,9 +33,11 @@ Required packages:
 
 ### Files
 
-- `tinnitus_sound_therapy.py` - Main Python module with all functions
+- `tinnitus_sound_therapy.py` - Main Python module with tinnitus therapy functions
+- `hearing_assessment_stimuli.py` - Standalone program for hearing assessment stimuli generation
 - `test_implementation.py` - Test suite to verify functionality
 - `requirements.txt` - Python dependencies
+- `pyproject.toml` - Modern Python project configuration for uv
 
 ## Usage
 
@@ -104,6 +106,36 @@ from tinnitus_sound_therapy import generate_hearing_tinnitus_estimation_stimuli
 # Generate pure tone and narrowband noise stimuli for hearing assessment
 generate_hearing_tinnitus_estimation_stimuli()
 ```
+
+### Hearing Assessment Stimuli Generation
+
+A separate standalone program generates hearing assessment stimuli for tinnitus frequency estimation:
+
+```bash
+# Generate hearing assessment stimuli (8 files)
+python hearing_assessment_stimuli.py
+
+# Generate in specific directory
+python hearing_assessment_stimuli.py -o hearing_tests
+
+# Generate MP4 format quietly
+python hearing_assessment_stimuli.py -f mp4 --quiet
+
+# Show help
+python hearing_assessment_stimuli.py --help
+```
+
+**Generated Files:**
+- `Hearing_Tinnitus_Estimation_Stimuli_PT_NH.wav` - Pure tones, Normal Hearing
+- `Hearing_Tinnitus_Estimation_Stimuli_NBN_NH.wav` - Narrowband noise, Normal Hearing
+- `Hearing_Tinnitus_Estimation_Stimuli_PT_MildHL.wav` - Pure tones, Mild Hearing Loss
+- `Hearing_Tinnitus_Estimation_Stimuli_NBN_MildHL.wav` - Narrowband noise, Mild Hearing Loss
+- `Hearing_Tinnitus_Estimation_Stimuli_PT_ModHL.wav` - Pure tones, Moderate Hearing Loss
+- `Hearing_Tinnitus_Estimation_Stimuli_NBN_ModHL.wav` - Narrowband noise, Moderate Hearing Loss
+- `Hearing_Tinnitus_Estimation_Stimuli_PT_SevHL.wav` - Pure tones, Severe Hearing Loss
+- `Hearing_Tinnitus_Estimation_Stimuli_NBN_SevHL.wav` - Narrowband noise, Severe Hearing Loss
+
+Each file contains 17 test frequencies from 1-16 kHz in 1/4 octave steps, with 1-second stimuli separated by 1-second silent intervals.
 
 ### Utility Functions
 

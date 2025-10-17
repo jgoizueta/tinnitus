@@ -82,7 +82,9 @@ Random_File_Names_Key*
 *_stimulus_*.wav
 test_output.wav
 demo_stimulus.wav
+high_freq_test.wav
 Hearing_Tinnitus_Estimation_Stimuli_*.mp4
+Hearing_Tinnitus_Estimation_Stimuli_*.wav
 Tin_Mod_File_*.wav
 Tin_Mod_File_*.mp4
 
