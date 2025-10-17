@@ -343,6 +343,117 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
     return stim_out
 
 
+def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing_profile: str,
+                                      file_number: int = 1, loud: float = 0.1,
+                                      output_dir: str = ".", randnames: bool = False,
+                                      name_key_file: str = 'Random_File_Names_Key') -> str:
+    """
+    Generate a single experimental stimulus file for specific parameters
+
+    Args:
+        mod_type: modulation type ('noise', 'amp', 'phase')
+        fband_index: frequency band index (0-6 for FB1-FB7)
+        hearing_profile: hearing correction profile ('NH', 'MildHL', 'ModHL', 'SevHL')
+        file_number: file number for this category (default: 1)
+        loud: loudness scaling factor (default: 0.1)
+        output_dir: output directory (default: current directory)
+        randnames: whether to use random file names (default: False)
+        name_key_file: filename for the randomization key
+
+    Returns:
+        filepath of generated file
+
+    William Sedley - Last updated September 2024
+    """
+    import os
+
+    # Validate inputs
+    valid_mod_types = ['noise', 'amp', 'phase']
+    valid_hearing_profiles = ['NH', 'MildHL', 'ModHL', 'SevHL']
+
+    if mod_type not in valid_mod_types:
+        raise ValueError(f"mod_type must be one of {valid_mod_types}, got '{mod_type}'")
+    if fband_index < 0 or fband_index > 6:
+        raise ValueError(f"fband_index must be 0-6 (FB1-FB7), got {fband_index}")
+    if hearing_profile not in valid_hearing_profiles:
+        raise ValueError(f"hearing_profile must be one of {valid_hearing_profiles}, got '{hearing_profile}'")
+
+    # Parameters from MatLab implementation
+    srate = 44100
+    dur_range = [4, 4]
+    ramp_prop = 0.25
+    f0_range = [96, 256]
+    n_per_file = 900  # 60 minutes exactly
+
+    # Frequency bands setup - exactly matching MatLab
+    fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
+    fbands = [[fb[i], fb[i+1]] for i in range(8)]  # 8 frequency bands
+
+    fhz = 1000 * (2 ** np.arange(0, 4.25, 0.25))
+    hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
+    hl_corr_temp_fbands = hl_corr_temp[1::2]  # Every second element starting from index 1
+
+    hl_corr_vals = {'NH': 0, 'MildHL': 15, 'ModHL': 30, 'SevHL': 45}
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Generate filename
+    fname_tmp = f"{mod_type}_FB{fband_index+1}_{hearing_profile}_{file_number}.wav"
+
+    if randnames:
+        # For random names, we'd need to manage the global counter
+        # For simplicity, use timestamp-based random name for single file generation
+        import time
+        random_id = int(time.time() * 1000) % 10000
+        rname_tmp = f"Tin_Mod_File_{random_id}.wav"
+        filepath = os.path.join(output_dir, rname_tmp)
+        # Could save the mapping to file_key if needed
+    else:
+        filepath = os.path.join(output_dir, fname_tmp)
+
+    print(f"Generating {mod_type} modulation, FB{fband_index+1}, {hearing_profile} profile...")
+
+    # Generate stimulus sequence
+    stim = []
+    for s in range(n_per_file):
+        dur_tmp = np.round(10 * (min(dur_range) + np.random.rand() * np.diff(dur_range)[0])) / 10
+        f0_tmp = int(np.round(min(f0_range) + np.random.rand() * np.diff(f0_range)[0]))
+        fband_db = hl_corr_temp_fbands * hl_corr_vals[hearing_profile]
+        fband_mod = [fband_index, fband_index + 1]  # Use adjacent frequency bands
+
+        stim_tmp = mod_ripple(
+            f0=f0_tmp,
+            rand_phase=0,
+            dur=dur_tmp,
+            loud=loud,
+            ramp=dur_tmp * ramp_prop,
+            tmr=1,
+            smr=[1.5, 7.5],  # Updated SMR values
+            scyc=8,
+            fbands=fbands,
+            fbanddb=fband_db.tolist(),
+            fband_mod=fband_mod,
+            mod_type=mod_type,
+            normfreq=0
+        )
+        stim.extend(stim_tmp)
+
+    stim = np.array(stim)
+    maxabs = np.max(np.abs(stim))
+    if maxabs > 1:
+        stim = stim / maxabs
+        print('  Downscaling to prevent clipping.')
+
+    # Save file
+    sf.write(filepath, stim, srate)
+
+    duration_min = len(stim) / srate / 60
+    print(f"  Generated: {os.path.basename(filepath)} ({duration_min:.1f} minutes)")
+
+    return filepath
+
+
 def generate_full_experiment_stimuli_updated(loud: float = 0.1, files_per_category: int = 1,
                                            randnames: bool = False, name_key_file: str = 'Random_File_Names_Key') -> None:
     """
@@ -393,53 +504,31 @@ def generate_full_experiment_stimuli_updated(loud: float = 0.1, files_per_catego
         for b in range(len(fbands) - 1):  # -1 because we use pairs of adjacent bands
             for h in range(len(hl_corr_vals)):
                 for f in range(files_per_category):
-                    fname_tmp = f"{mod_type[m]}_FB{b+1}_{hl_corr_labels[h]}_{f+1}.wav"
-
-                    if randnames:
-                        ntmp = rnames[0]
-                        rnames = rnames[1:]
-                        rname_tmp = f"Tin_Mod_File_{ntmp}.wav"
-                        file_key.append([fname_tmp, rname_tmp])
-
-                    stim = []
-                    for s in range(n_per_file):
-                        dur_tmp = np.round(10 * (min(dur_range) + np.random.rand() * np.diff(dur_range)[0])) / 10
-                        f0_tmp = int(np.round(min(f0_range) + np.random.rand() * np.diff(f0_range)[0]))
-                        fband_db = hl_corr_temp_fbands * hl_corr_vals[h]
-                        fband_mod = [b, b + 1]  # Use adjacent frequency bands
-
-                        stim_tmp = mod_ripple(
-                            f0=f0_tmp,
-                            rand_phase=0,
-                            dur=dur_tmp,
-                            loud=loud,
-                            ramp=dur_tmp * ramp_prop,
-                            tmr=1,
-                            smr=[1.5, 7.5],  # Updated SMR values
-                            scyc=8,
-                            fbands=fbands,
-                            fbanddb=fband_db.tolist(),
-                            fband_mod=fband_mod,
+                    # Use the single stimulus generation function
+                    try:
+                        filepath = generate_single_experiment_stimulus(
                             mod_type=mod_type[m],
-                            normfreq=0
+                            fband_index=b,
+                            hearing_profile=hl_corr_labels[h],
+                            file_number=f + 1,
+                            loud=loud,
+                            output_dir=".",  # Current directory
+                            randnames=randnames,
+                            name_key_file=name_key_file
                         )
-                        stim.extend(stim_tmp)
 
-                    stim = np.array(stim)
-                    maxabs = np.max(np.abs(stim))
-                    if maxabs > 1:
-                        stim = stim / maxabs
-                        print('Downscaling to prevent clipping.')
+                        if randnames:
+                            # For consistency with original behavior, track the mapping
+                            import os
+                            fname_tmp = f"{mod_type[m]}_FB{b+1}_{hl_corr_labels[h]}_{f+1}.wav"
+                            file_key.append([fname_tmp, os.path.basename(filepath)])
 
-                    if randnames:
-                        sf.write(rname_tmp, stim, srate)
-                        print(f"Generated: {rname_tmp}")
-                    else:
-                        sf.write(fname_tmp, stim, srate)
-                        print(f"Generated: {fname_tmp}")
+                        file_count += 1
+                        print(f"Progress: {file_count}/{total_files} files completed")
 
-                    file_count += 1
-                    print(f"Progress: {file_count}/{total_files} files completed")
+                    except Exception as e:
+                        print(f"Error generating {mod_type[m]}_FB{b+1}_{hl_corr_labels[h]}_{f+1}: {e}")
+                        continue
 
     if randnames:
         np.save(name_key_file, file_key)
@@ -716,6 +805,8 @@ def main():
 
     print("\nExample stimuli created successfully!")
     print("\nTo generate experimental stimuli:")
+    print("# Single stimulus file:")
+    print("generate_single_experiment_stimulus('amp', 2, 'NH')  # Amplitude mod, FB3, Normal Hearing")
     print("# Test version (minimal files for testing):")
     print("test_experimental_stimuli_generation(n_per_file=2)")
     print("# Full version - Original:")

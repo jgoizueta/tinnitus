@@ -84,6 +84,32 @@ stimulus = mod_ripple(
 )
 ```
 
+#### `generate_single_experiment_stimulus()` - Generate single specific stimulus
+
+```python
+from tinnitus_sound_therapy import generate_single_experiment_stimulus
+
+# Generate a single specific stimulus file
+filepath = generate_single_experiment_stimulus(
+    mod_type='amp',         # Modulation type: 'noise', 'amp', 'phase'
+    fband_index=2,          # Frequency band index: 0-6 (FB1-FB7)
+    hearing_profile='NH',   # Hearing profile: 'NH', 'MildHL', 'ModHL', 'SevHL'
+    file_number=1,          # File number for this category
+    loud=0.1,               # Loudness scaling
+    output_dir="."          # Output directory
+)
+# Returns: './amp_FB3_NH_1.wav'
+```
+
+**Frequency Band Mapping:**
+- `fband_index=0` → FB1: 1000-1414 & 1414-2000 Hz
+- `fband_index=1` → FB2: 1414-2000 & 2000-2828 Hz
+- `fband_index=2` → FB3: 2000-2828 & 2828-4000 Hz
+- `fband_index=3` → FB4: 2828-4000 & 4000-5657 Hz
+- `fband_index=4` → FB5: 4000-5657 & 5657-8000 Hz
+- `fband_index=5` → FB6: 5657-8000 & 8000-11314 Hz
+- `fband_index=6` → FB7: 8000-11314 & 11314-16000 Hz
+
 #### `generate_full_experiment_stimuli()` - Generate complete stimulus set
 
 ```python
@@ -173,6 +199,7 @@ ramped_signal = wind_ramp(
 | Function | Description |
 |----------|-------------|
 | `mod_ripple()` | Create harmonic complexes with band-limited modulation |
+| `generate_single_experiment_stimulus()` | Generate single specific experimental stimulus |
 | `generate_full_experiment_stimuli()` | Generate complete experimental stimulus set |
 | `generate_hearing_tinnitus_estimation_stimuli()` | Generate hearing estimation stimuli |
 | `create_example_stimulus()` | Create simple example stimulus |
