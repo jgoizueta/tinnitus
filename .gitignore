@@ -1,0 +1,85 @@
+# Original academic paper and MatLab files - exclude from Python port repo
+*.pdf
+Tinnitus_Spectral_Ripple_Sound_Therapy_Files/
+README.txt
+
+# Generated audio files
+*.wav
+*.mp3
+*.mp4
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Generated data files
+Random_File_Names_Key*
+*_stimulus_*.wav
+test_output.wav
+demo_stimulus.wav
+Hearing_Tinnitus_Estimation_Stimuli_*.mp4
+Tin_Mod_File_*.mp4
