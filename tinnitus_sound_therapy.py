@@ -55,7 +55,11 @@ def farpn(srate: int, low_f: float, high_f: float, dur: float) -> np.ndarray:
         sig = sig[:npts_needed]
 
     # Set RMS value to 0.1
-    x = sig / (10 * np.std(sig))
+    sig_std = np.std(sig)
+    if sig_std > 0:
+        x = sig / (10 * sig_std)
+    else:
+        x = sig  # If std is 0, signal is already at zero
 
     return x
 
@@ -307,7 +311,10 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
         stmp_std = np.std(stim_tmp)
         noise_tmp = farpn(srate, np.min(fimod), np.max(fimod), dur)  # Noise to fill in gap
         noise_std = np.std(noise_tmp)
-        noise_tmp = noise_tmp * stmp_std / noise_std  # Scale to same RMS as harmonic band being replaced
+        if noise_std > 0 and stmp_std > 0:
+            noise_tmp = noise_tmp * stmp_std / noise_std  # Scale to same RMS as harmonic band being replaced
+        elif stmp_std == 0:
+            noise_tmp = np.zeros_like(noise_tmp)  # If target is silent, make noise silent too
         stim_mat[fmodind, :] = 0  # Silence harmonics from noise band
         stim_mat[np.min(fmodind), :] = noise_tmp  # Add noise to noise band
         mmat = np.ones_like(fimat)
@@ -458,7 +465,7 @@ def generate_hearing_tinnitus_estimation_stimuli() -> None:
             sf.write(filename, stim_all, srate)
 
 
-def create_example_stimulus(f0: float = 150, mod_type: str = 'amp', duration: float = 4.0,
+def create_example_stimulus(f0: float = 9185, mod_type: str = 'amp', duration: float = 4.0,
                           output_filename: str = 'example_tinnitus_stimulus.wav') -> np.ndarray:
     """
     Create a simple example tinnitus therapy stimulus
@@ -472,10 +479,23 @@ def create_example_stimulus(f0: float = 150, mod_type: str = 'amp', duration: fl
     Returns:
         generated stimulus array
     """
-    # Set up frequency bands (example using 2-4 kHz band)
-    fbands = [[1000, 1414], [1414, 2000], [2000, 2828], [2828, 4000], [4000, 5657], [5657, 8000]]
-    fbanddb = [0, 0, 0, 0, 0, 0]  # No hearing loss correction
-    fband_mod = [2, 3]  # Modulate the 2-4 kHz bands
+    # Set up frequency bands that can accommodate the fundamental frequency
+    # Create bands that span from f0 to ~3*f0 to ensure harmonics fall within bands
+    if f0 < 2000:
+        # Low frequency - use original bands
+        fbands = [[1000, 1414], [1414, 2000], [2000, 2828], [2828, 4000], [4000, 5657], [5657, 8000]]
+        fband_mod = [2, 3]  # Modulate the 2-4 kHz bands
+    else:
+        # High frequency - create bands around f0 and its harmonics
+        base_freq = f0 * 0.8  # Start slightly below f0
+        fbands = []
+        for i in range(6):
+            low = base_freq * (1.4 ** i)
+            high = base_freq * (1.4 ** (i + 1))
+            fbands.append([low, high])
+        fband_mod = [1, 2]  # Modulate bands containing f0 and 2*f0
+
+    fbanddb = [0] * len(fbands)  # No hearing loss correction
 
     # Generate stimulus
     stimulus = mod_ripple(
@@ -511,9 +531,9 @@ def main():
     # Create example stimuli with different modulation types
     print("Creating example stimuli...")
 
-    create_example_stimulus(f0=150, mod_type='amp', output_filename='amplitude_modulation_example.wav')
-    create_example_stimulus(f0=150, mod_type='phase', output_filename='phase_modulation_example.wav')
-    create_example_stimulus(f0=150, mod_type='noise', output_filename='noise_modulation_example.wav')
+    create_example_stimulus(f0=9185, mod_type='amp', output_filename='amplitude_modulation_example.wav')
+    create_example_stimulus(f0=9185, mod_type='phase', output_filename='phase_modulation_example.wav')
+    create_example_stimulus(f0=9185, mod_type='noise', output_filename='noise_modulation_example.wav')
 
     print("\nExample stimuli created successfully!")
     print("\nTo generate full experimental stimuli (WARNING: creates many files):")
