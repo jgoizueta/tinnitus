@@ -2,6 +2,7 @@
 *.pdf
 Tinnitus_Spectral_Ripple_Sound_Therapy_Files/
 README.txt
+Final_Data_Set.xlsx
 
 # Generated audio files
 *.wav
