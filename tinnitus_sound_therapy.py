@@ -29,8 +29,8 @@ def farpn(srate: int, low_f: float, high_f: float, dur: float) -> np.ndarray:
     Returns:
         output stimulus (1D array)
 
-    Originally by Tim Griffiths, 2004
-    Part of Pitch Stimulus Design Toolbox
+    Originally coded in MatLab by Tim Griffiths, 2004
+    Part of Pitch Stimulus Design Toolbox (https://github.com/lerud/lerud.github.io/)
     """
     # Calculate number of samples needed
     npts_needed = int(dur * srate)
@@ -226,7 +226,7 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
         tmr: temporal modulation rate of superimposed ripple (Hz) - suggest 1
         smr: [minimum, maximum] spectral modulation rate (cyc/oct) - suggest [1.5,7.5]
         scyc: cycle duration for changing SMR (higher value = slower rate of change) (s) - suggest 8
-        fbands: lower and upper limits (Hz) of specified frequency bands
+        fbands: lower and upper limits (Hz) of specified frequency bands - [[lo1, hi1], [lo2, hi2], ...]
         fbanddb: amplitude scaling value (dB) for each specified frequency band
         fband_mod: indices of frequency bands to receive modulation (0-indexed)
         mod_type: type of modulation: 'phase', 'amp', 'noise', or 'none'
@@ -245,26 +245,27 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
     t = np.arange(1/srate, dur + 1/srate, 1/srate)  # Time vector for stimulus
 
     # Determine harmonic details
-    fn = []
-    fmod = []
-    fintens = []
-    band_ind = [[] for _ in range(len(fbands))]
-    ind_tot = 0
+    fn = [] # Number of the harmonics of f0 (frequency of harmonic = fn * f0)
+    fmod = [] # For each harmonic, whether it is to be modulated (1) or not (0)
+    fintens = [] # Relative intensity of harmonics
+    band_ind = [[] for _ in range(len(fbands))] # Indices of harmonics (0-based position in fn) belonging to each frequency band
+    ind_tot = 0 # number of harmonics (elements in fn)
     nf = len(fbands)
 
-    for f in range(nf):
-        frange_tmp = fbands[f]
+    for f_index in range(nf):
+        f = f_index + 1
+        frange_tmp = fbands[f_index]
         fntmp = list(range(int(np.ceil(frange_tmp[0]/f0)), int(np.floor((frange_tmp[1]-1)/f0)) + 1))
-        fn.extend(fntmp)  # Number of harmonics
+        fn.extend(fntmp)  # Numbers of the harmonics within the current band frange_tmp
 
         if f in fband_mod:
             fmod.extend([1] * len(fntmp))  # Yes or no to harmonic modulation
         else:
             fmod.extend([0] * len(fntmp))
 
-        fintens.extend([10**(fbanddb[f]/20)] * len(fntmp))  # Relative intensity of harmonics
+        fintens.extend([10**(fbanddb[f_index]/20)] * len(fntmp))  # Relative intensity of harmonics
         nind_tmp = len(fntmp)
-        band_ind[f] = list(range(ind_tot, ind_tot + nind_tmp))  # Indices of harmonics belonging to each frequency band
+        band_ind[f_index] = list(range(ind_tot, ind_tot + nind_tmp))  # Indices of harmonics belonging to each frequency band
         ind_tot = ind_tot + nind_tmp
 
     fn = np.array(fn)
@@ -799,9 +800,12 @@ def main():
     # Create example stimuli with different modulation types
     print("Creating example stimuli...")
 
-    create_example_stimulus(f0=150, mod_type='amp', output_filename='amplitude_modulation_example.wav')
-    create_example_stimulus(f0=150, mod_type='phase', output_filename='phase_modulation_example.wav')
-    create_example_stimulus(f0=150, mod_type='noise', output_filename='noise_modulation_example.wav')
+    # create_example_stimulus(f0=150, mod_type='amp', output_filename='amplitude_modulation_example.wav')
+    # create_example_stimulus(f0=150, mod_type='phase', output_filename='phase_modulation_example.wav')
+    # create_example_stimulus(f0=150, mod_type='noise', output_filename='noise_modulation_example.wav')
+    generate_single_experiment_stimulus('phase', 5, 'MildHL')
+    generate_single_experiment_stimulus('amp', 5, 'MildHL')
+    generate_single_experiment_stimulus('noise', 5, 'MildHL')
 
     print("\nExample stimuli created successfully!")
     print("\nTo generate experimental stimuli:")
