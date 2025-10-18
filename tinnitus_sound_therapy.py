@@ -819,9 +819,6 @@ def frequency_to_band_index(frequency_hz: float, prefer_lower: bool = False) -> 
     Raises:
         ValueError: if frequency is outside the supported range
     """
-    # FIXME: by default select the band where the frequency is more centered logarithmically,
-    # (i.e. the difference betweeen hi/f and f/lo is minimized i.e. hi*lo/f^2 should be closer to 1)
-    # if prefer_lower is True select the lower to that band if it also contains the frequency.
 
     # Frequency bands setup - exactly matching MatLab
     fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
@@ -850,10 +847,31 @@ def frequency_to_band_index(frequency_hz: float, prefer_lower: bool = False) -> 
         return containing_pairs[0]
     else:
         # Multiple pairs contain this frequency (on boundary)
+        # Implement logarithmic centering: select band where frequency is most centered logarithmically
+        # Criterion: minimize |hi/f - f/lo| which is equivalent to making hi*lo/f² closest to 1
+
+        best_pair = containing_pairs[0]
+        best_centering = float('inf')
+
+        for pair_idx in containing_pairs:
+            low, high = band_pairs[pair_idx]
+            # Calculate logarithmic centering metric: how close hi*lo/f² is to 1
+            centering_metric = abs((high * low) / (frequency_hz ** 2) - 1)
+
+            if centering_metric < best_centering:
+                best_centering = centering_metric
+                best_pair = pair_idx
+
+        # If prefer_lower is True and the lower band also contains the frequency,
+        # check if we should override the logarithmic choice
         if prefer_lower:
-            return min(containing_pairs)
-        else:
-            return max(containing_pairs)
+            lower_pair = min(containing_pairs)
+            if lower_pair != best_pair:
+                # The lower pair is different from the logarithmically best one
+                # Use the lower pair as requested
+                return lower_pair
+
+        return best_pair
 
 
 def generate_cli_stimuli(frequency_hz: Optional[float] = None,
