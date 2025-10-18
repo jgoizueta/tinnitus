@@ -347,7 +347,8 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
 def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing_profile: str,
                                       file_number: int = 1, loud: float = 0.1,
                                       output_dir: str = ".", randnames: bool = False,
-                                      name_key_file: str = 'Random_File_Names_Key') -> str:
+                                      name_key_file: str = 'Random_File_Names_Key',
+                                      duration_seconds: float = 3600) -> str:
     """
     Generate a single experimental stimulus file for specific parameters
 
@@ -360,6 +361,7 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
         output_dir: output directory (default: current directory)
         randnames: whether to use random file names (default: False)
         name_key_file: filename for the randomization key
+        duration_seconds: total duration of generated file in seconds (default: 3600 = 1 hour)
 
     Returns:
         filepath of generated file
@@ -384,7 +386,10 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
     dur_range = [4, 4]
     ramp_prop = 0.25
     f0_range = [96, 256]
-    n_per_file = 900  # 60 minutes exactly
+
+    # Calculate number of stimuli needed for target duration
+    # Each stimulus is ~4 seconds, so n_per_file = duration_seconds / 4
+    n_per_file = max(1, int(duration_seconds / 4))  # At least 1 stimulus
 
     # Frequency bands setup - exactly matching MatLab
     fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
@@ -790,35 +795,316 @@ def create_example_stimulus(f0: float = 150, mod_type: str = 'amp', duration: fl
     return stimulus
 
 
+def frequency_to_band_index(frequency_hz: float, prefer_lower: bool = False) -> int:
+    """
+    Convert a tinnitus frequency to the appropriate frequency band pair index
+
+    The modulation uses consecutive pairs of frequency bands. This function determines
+    which pair index should be used such that fband_mod = [index, index+1] will
+    modulate the appropriate bands containing the target frequency.
+
+    Args:
+        frequency_hz: tinnitus frequency in Hz
+        prefer_lower: if True, prefer lower band pair when frequency is on boundary (default: False, prefer higher)
+
+    Returns:
+        band pair index (0-6) where:
+        - 0 → FB1-FB2 (1000-2000 Hz)
+        - 1 → FB2-FB3 (1414-2828 Hz)
+        - 2 → FB3-FB4 (2000-4000 Hz)
+        - 3 → FB4-FB5 (2828-5657 Hz)
+        - 4 → FB5-FB6 (4000-8000 Hz)
+        - 5 → FB6-FB7 (5657-11314 Hz)
+        - 6 → FB7-FB8 (8000-16000 Hz)
+
+    Raises:
+        ValueError: if frequency is outside the supported range
+    """
+    # Frequency bands setup - exactly matching MatLab
+    fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
+    fbands = [[fb[i], fb[i+1]] for i in range(8)]  # 8 individual frequency bands
+
+    # Create consecutive band pairs (FB1-FB2, FB2-FB3, etc.)
+    band_pairs = []
+    for i in range(7):  # 7 possible pairs
+        pair_low = fbands[i][0]     # Start of first band
+        pair_high = fbands[i+1][1]  # End of second band
+        band_pairs.append([pair_low, pair_high])
+
+    # Find which band pairs contain the frequency
+    containing_pairs = []
+    for i, (low, high) in enumerate(band_pairs):
+        if low <= frequency_hz <= high:
+            containing_pairs.append(i)
+
+    if not containing_pairs:
+        # Show available frequency ranges for better error message
+        ranges = [f"FB{i+1}-FB{i+2}: {band_pairs[i][0]:.0f}-{band_pairs[i][1]:.0f} Hz" for i in range(7)]
+        raise ValueError(f"Frequency {frequency_hz} Hz is outside supported range. "
+                        f"Supported ranges: {', '.join(ranges)}")
+
+    if len(containing_pairs) == 1:
+        return containing_pairs[0]
+    else:
+        # Multiple pairs contain this frequency (on boundary)
+        if prefer_lower:
+            return min(containing_pairs)
+        else:
+            return max(containing_pairs)
+
+
+def generate_cli_stimuli(frequency_hz: Optional[float] = None,
+                        prefer_lower_band: bool = False,
+                        mod_types: Optional[List[str]] = None,
+                        hearing_profiles: Optional[List[str]] = None,
+                        files_per_category: int = 1,
+                        output_dir: str = ".",
+                        file_prefix: str = "",
+                        randnames: bool = False,
+                        loud: float = 0.1,
+                        duration_seconds: float = 3600,
+                        generate_all: bool = False) -> None:
+    """
+    Generate tinnitus therapy stimuli based on CLI parameters
+
+    Args:
+        frequency_hz: target tinnitus frequency in Hz (None = all bands)
+        prefer_lower_band: prefer lower band when frequency is on boundary
+        mod_types: list of modulation types or None for all
+        hearing_profiles: list of hearing profiles or None for ['NH']
+        files_per_category: number of files per category
+        output_dir: output directory
+        file_prefix: prefix for generated filenames
+        randnames: use random filenames
+        loud: loudness scaling factor
+        duration_seconds: duration of each generated file in seconds
+        generate_all: generate all combinations (ignores other filters)
+    """
+    import os
+
+    # Set defaults
+    if mod_types is None:
+        mod_types = ['noise', 'amp', 'phase']
+    if hearing_profiles is None:
+        hearing_profiles = ['NH']
+
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+
+    if generate_all:
+        print("Generating full experimental stimulus set...")
+        generate_full_experiment_stimuli_updated(
+            loud=loud,
+            files_per_category=files_per_category,
+            randnames=randnames,
+            name_key_file=os.path.join(output_dir, 'Random_File_Names_Key')
+        )
+        return
+
+    # Determine frequency bands to generate
+    if frequency_hz is not None:
+        try:
+            band_index = frequency_to_band_index(frequency_hz, prefer_lower_band)
+            band_indices = [band_index]
+            print(f"Target frequency: {frequency_hz} Hz → FB{band_index+1}-FB{band_index+2}")
+        except ValueError as e:
+            print(f"Error: {e}")
+            return
+    else:
+        band_indices = list(range(7))  # FB1-FB7 (0-6)
+        print("Generating for all frequency bands (FB1-FB7)")
+
+    print(f"Modulation types: {', '.join(mod_types)}")
+    print(f"Hearing profiles: {', '.join(hearing_profiles)}")
+    print(f"Files per category: {files_per_category}")
+    print(f"Duration per file: {duration_seconds} seconds ({duration_seconds/60:.1f} minutes)")
+    print(f"Output directory: {output_dir}")
+    if file_prefix:
+        print(f"File prefix: {file_prefix}")
+    print()
+
+    total_files = len(band_indices) * len(mod_types) * len(hearing_profiles) * files_per_category
+    print(f"Will generate {total_files} files...")
+    print()
+
+    file_count = 0
+    for band_idx in band_indices:
+        for mod_type in mod_types:
+            for hearing_profile in hearing_profiles:
+                for file_num in range(1, files_per_category + 1):
+                    try:
+                        # Generate the stimulus
+                        filepath = generate_single_experiment_stimulus(
+                            mod_type=mod_type,
+                            fband_index=band_idx,
+                            hearing_profile=hearing_profile,
+                            file_number=file_num,
+                            loud=loud,
+                            output_dir=output_dir,
+                            randnames=randnames,
+                            duration_seconds=duration_seconds
+                        )
+
+                        # Apply file prefix if specified
+                        if file_prefix and not randnames:
+                            old_path = filepath
+                            filename = os.path.basename(filepath)
+                            new_filename = f"{file_prefix}{filename}"
+                            new_path = os.path.join(output_dir, new_filename)
+                            os.rename(old_path, new_path)
+                            print(f"  Renamed to: {new_filename}")
+
+                        file_count += 1
+                        print(f"Progress: {file_count}/{total_files} files completed")
+
+                    except Exception as e:
+                        print(f"Error generating {mod_type}_FB{band_idx+1}_{hearing_profile}_{file_num}: {e}")
+                        continue
+
+    print(f"\nCompleted! Generated {file_count} files in {output_dir}")
+
+
 def main():
     """
-    Example usage of the tinnitus sound therapy functions
+    Command-line interface for tinnitus sound therapy stimulus generation
     """
-    print("Tinnitus Sound Therapy - Python Implementation")
-    print("=" * 50)
+    import argparse
+    import sys
 
-    # Create example stimuli with different modulation types
-    print("Creating example stimuli...")
+    parser = argparse.ArgumentParser(
+        description="Generate tinnitus sound therapy stimuli",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --all                              # Generate all 84 files
+  %(prog)s -f 3000                           # Generate for 3 kHz tinnitus
+  %(prog)s -f 2000 --prefer-lower            # 2 kHz, prefer lower band
+  %(prog)s -f 4000 -m amp phase              # 4 kHz, amplitude and phase only
+  %(prog)s -f 1500 --hearing-profile NH MildHL              # 1.5 kHz, normal and mild HL
+  %(prog)s -f 8000 -n 3 -o therapy_files                 # 8 kHz, 3 files per category
+  %(prog)s -m noise --hearing-profile SevHL --prefix severe_ # Noise modulation, severe HL
 
-    # create_example_stimulus(f0=150, mod_type='amp', output_filename='amplitude_modulation_example.wav')
-    # create_example_stimulus(f0=150, mod_type='phase', output_filename='phase_modulation_example.wav')
-    # create_example_stimulus(f0=150, mod_type='noise', output_filename='noise_modulation_example.wav')
-    generate_single_experiment_stimulus('phase', 5, 'MildHL')
-    generate_single_experiment_stimulus('amp', 5, 'MildHL')
-    generate_single_experiment_stimulus('noise', 5, 'MildHL')
+Frequency Band Mapping:
+  FB1: 1000-1414 Hz    FB2: 1414-2000 Hz    FB3: 2000-2828 Hz    FB4: 2828-4000 Hz
+  FB5: 4000-5657 Hz    FB6: 5657-8000 Hz    FB7: 8000-11314 Hz
+        """
+    )
 
-    print("\nExample stimuli created successfully!")
-    print("\nTo generate experimental stimuli:")
-    print("# Single stimulus file:")
-    print("generate_single_experiment_stimulus('amp', 2, 'NH')  # Amplitude mod, FB3, Normal Hearing")
-    print("# Test version (minimal files for testing):")
-    print("test_experimental_stimuli_generation(n_per_file=2)")
-    print("# Full version - Original:")
-    print("generate_full_experiment_stimuli(files_per_category=1)")
-    print("# Full version - Updated (matches latest MatLab Sept 2024):")
-    print("generate_full_experiment_stimuli_updated(files_per_category=1, randnames=False)")
-    print("\nTo generate hearing estimation stimuli:")
-    print("generate_hearing_tinnitus_estimation_stimuli()")
+    # Main options
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Generate all experimental stimuli (84 files, ~60GB)"
+    )
+
+    parser.add_argument(
+        "-f", "--frequency",
+        type=float,
+        help="Tinnitus frequency in Hz (determines frequency band)"
+    )
+
+    parser.add_argument(
+        "--prefer-lower",
+        action="store_true",
+        help="When frequency is on band boundary, prefer lower band (default: prefer higher)"
+    )
+
+    parser.add_argument(
+        "-m", "--modulation",
+        choices=["noise", "amp", "phase"],
+        nargs="+",
+        default=None,
+        help="Modulation type(s) (default: all types)"
+    )
+
+    parser.add_argument(
+        "--hearing-profile",
+        choices=["NH", "MildHL", "ModHL", "SevHL"],
+        nargs="+",
+        default=["NH"],
+        help="Hearing loss profile(s) (default: NH only)"
+    )
+
+    parser.add_argument(
+        "-n", "--files-per-category",
+        type=int,
+        default=1,
+        help="Number of files per category (default: 1)"
+    )
+
+    # Output options
+    parser.add_argument(
+        "-o", "--output-dir",
+        default=".",
+        help="Output directory (default: current directory)"
+    )
+
+    parser.add_argument(
+        "--prefix",
+        default="",
+        help="Prefix for generated filenames"
+    )
+
+    parser.add_argument(
+        "--random-names",
+        action="store_true",
+        help="Use random filenames instead of descriptive names"
+    )
+
+    parser.add_argument(
+        "--loud",
+        type=float,
+        default=0.1,
+        help="Loudness scaling factor (default: 0.1)"
+    )
+
+    parser.add_argument(
+        "-d", "--duration",
+        type=float,
+        default=3600,
+        help="Duration of each file in seconds (default: 3600 = 1 hour)"
+    )
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Validate arguments
+    if not args.all and args.frequency is None:
+        parser.error("Must specify either --all or -f/--frequency")
+
+    if args.all and args.frequency is not None:
+        parser.error("Cannot specify both --all and -f/--frequency")
+
+    if args.files_per_category < 1:
+        parser.error("files-per-category must be >= 1")
+
+    if args.duration <= 0:
+        parser.error("duration must be > 0")
+
+    try:
+        print("Tinnitus Sound Therapy - Python Implementation")
+        print("=" * 50)
+
+        generate_cli_stimuli(
+            frequency_hz=args.frequency,
+            prefer_lower_band=args.prefer_lower,
+            mod_types=args.modulation,
+            hearing_profiles=args.hearing_profile,
+            files_per_category=args.files_per_category,
+            output_dir=args.output_dir,
+            file_prefix=args.prefix,
+            randnames=args.random_names,
+            loud=args.loud,
+            duration_seconds=args.duration,
+            generate_all=args.all
+        )
+
+    except KeyboardInterrupt:
+        print("\nGeneration interrupted by user.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
