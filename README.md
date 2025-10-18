@@ -1,12 +1,11 @@
 # Tinnitus Sound Therapy
 
 
-This is a Python port of the MatLab code for generating audio stimulus files for tinnitus sound therapy available at https://data.ncl.ac.uk/articles/software/Tinnitus_Spectral_Ripple_Sound_Therapy_Files/27109693 based on the research by Yukhnovich, E.A., Harrison, S., Wray, N., Alter, K., and Sedley, W.
+This is a Python port of the MatLab code for generating audio stimulus files for tinnitus sound therapy based on the [research by Yukhnovich, E.A., Harrison, S., Wray, N., Alter, K., and Sedley, W.](https://www.sciencedirect.com/science/article/pii/S0378595525001534)
 
 ## Original Research
 
 - **Authors**: Yukhnovich, E.A., Harrison, S., Wray, N., Alter, K., Sedley, W.
-- **Contact**: Yukhnovich, E.A. ney14@newcastle.ac.uk
 - **DOI**: https://doi.org/10.25405/data.ncl.27109693
 - **License**: CC BY-NC-SA 4.0
 - **Last updated**: 15/10/2024
