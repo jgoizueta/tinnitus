@@ -253,12 +253,11 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
     nf = len(fbands)
 
     for f_index in range(nf):
-        f = f_index + 1
         frange_tmp = fbands[f_index]
         fntmp = list(range(int(np.ceil(frange_tmp[0]/f0)), int(np.floor((frange_tmp[1]-1)/f0)) + 1))
         fn.extend(fntmp)  # Numbers of the harmonics within the current band frange_tmp
 
-        if f in fband_mod:
+        if f_index in fband_mod:
             fmod.extend([1] * len(fntmp))  # Yes or no to harmonic modulation
         else:
             fmod.extend([0] * len(fntmp))
@@ -820,6 +819,10 @@ def frequency_to_band_index(frequency_hz: float, prefer_lower: bool = False) -> 
     Raises:
         ValueError: if frequency is outside the supported range
     """
+    # FIXME: by default select the band where the frequency is more centered logarithmically,
+    # (i.e. the difference betweeen hi/f and f/lo is minimized i.e. hi*lo/f^2 should be closer to 1)
+    # if prefer_lower is True select the lower to that band if it also contains the frequency.
+
     # Frequency bands setup - exactly matching MatLab
     fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
     fbands = [[fb[i], fb[i+1]] for i in range(8)]  # 8 individual frequency bands
