@@ -111,7 +111,6 @@ uv run python tinnitus_sound_therapy.py -f 3000
 |--------|-------------|---------|
 | `--all` | Generate all experimental stimuli (84 files, ~60GB) | - |
 | `-f, --frequency` | Tinnitus frequency in Hz (determines frequency band) | - |
-| `--prefer-lower` | When frequency is on band boundary, prefer lower band | False (prefer higher) |
 | `-m, --modulation` | Modulation type(s): `noise`, `amp`, `phase` | All types |
 | `--hearing-profile` | Hearing loss profile(s): `NH`, `MildHL`, `ModHL`, `SevHL` | NH only |
 | `-n, --files-per-category` | Number of files per category | 1 |
