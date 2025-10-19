@@ -831,6 +831,7 @@ def frequency_to_band_index(frequency_hz: float) -> int:
 
 
 def generate_cli_stimuli(frequency_hz: Optional[float] = None,
+                        mod_band: Optional[str] = None,
                         mod_types: Optional[List[str]] = None,
                         hearing_profiles: Optional[List[str]] = None,
                         files_per_category: int = 1,
@@ -845,6 +846,7 @@ def generate_cli_stimuli(frequency_hz: Optional[float] = None,
 
     Args:
         frequency_hz: target tinnitus frequency in Hz (None = all bands)
+        mod_band: frequency band name (FB1-FB7) for modulation (None = all bands)
         mod_types: list of modulation types or None for all
         hearing_profiles: list of hearing profiles or None for ['NH']
         files_per_category: number of files per category
@@ -885,6 +887,11 @@ def generate_cli_stimuli(frequency_hz: Optional[float] = None,
         except ValueError as e:
             print(f"Error: {e}")
             return
+    elif mod_band is not None:
+        # Convert band name (FB1-FB7) to index (0-6)
+        band_index = int(mod_band[2:]) - 1  # Extract number and convert to 0-based index
+        band_indices = [band_index]
+        print(f"Target band: {mod_band} → FB{band_index+1}-FB{band_index+2}")
     else:
         band_indices = list(range(7))  # FB1-FB7 (0-6)
         print("Generating for all frequency bands (FB1-FB7)")
@@ -953,10 +960,11 @@ def main():
 Examples:
   %(prog)s --all                              # Generate all 84 files
   %(prog)s -f 3000                           # Generate for 3 kHz tinnitus
+  %(prog)s --mod-band FB4                    # Generate for FB4-FB5 bands directly
   %(prog)s -f 4000 -m amp phase              # 4 kHz, amplitude and phase only
   %(prog)s -f 1500 --hearing-profile NH MildHL              # 1.5 kHz, normal and mild HL
   %(prog)s -f 8000 -n 3 -o therapy_files                 # 8 kHz, 3 files per category
-  %(prog)s -m noise --hearing-profile SevHL --prefix severe_ # Noise modulation, severe HL
+  %(prog)s --mod-band FB2 -m noise --hearing-profile SevHL  # Direct band selection with modulation
 
 Frequency Band Mapping:
   FB1: 1000-1414 Hz    FB2: 1414-2000 Hz    FB3: 2000-2828 Hz    FB4: 2828-4000 Hz
@@ -975,6 +983,12 @@ Frequency Band Mapping:
         "-f", "--frequency",
         type=float,
         help="Tinnitus frequency in Hz (determines frequency band)"
+    )
+
+    parser.add_argument(
+        "--mod-band",
+        choices=["FB1", "FB2", "FB3", "FB4", "FB5", "FB6", "FB7"],
+        help="Frequency band for modulation (alternative to --frequency)"
     )
 
     parser.add_argument(
@@ -1037,11 +1051,17 @@ Frequency Band Mapping:
     args = parser.parse_args()
 
     # Validate arguments
-    if not args.all and args.frequency is None:
-        parser.error("Must specify either --all or -f/--frequency")
+    if not args.all and args.frequency is None and args.mod_band is None:
+        parser.error("Must specify either --all, -f/--frequency, or --mod-band")
 
-    if args.all and args.frequency is not None:
-        parser.error("Cannot specify both --all and -f/--frequency")
+    # Check for mutual exclusivity
+    specified_options = sum([
+        args.all,
+        args.frequency is not None,
+        args.mod_band is not None
+    ])
+    if specified_options > 1:
+        parser.error("Cannot specify more than one of: --all, -f/--frequency, --mod-band")
 
     if args.files_per_category < 1:
         parser.error("files-per-category must be >= 1")
@@ -1055,6 +1075,7 @@ Frequency Band Mapping:
 
         generate_cli_stimuli(
             frequency_hz=args.frequency,
+            mod_band=args.mod_band,
             mod_types=args.modulation,
             hearing_profiles=args.hearing_profile,
             files_per_category=args.files_per_category,

@@ -111,6 +111,7 @@ uv run python tinnitus_sound_therapy.py -f 3000
 |--------|-------------|---------|
 | `--all` | Generate all experimental stimuli (84 files, ~60GB) | - |
 | `-f, --frequency` | Tinnitus frequency in Hz (determines frequency band) | - |
+| `--mod-band` | Direct frequency band selection (FB1-FB7, alternative to --frequency) | - |
 | `-m, --modulation` | Modulation type(s): `noise`, `amp`, `phase` | All types |
 | `--hearing-profile` | Hearing loss profile(s): `NH`, `MildHL`, `ModHL`, `SevHL` | NH only |
 | `-n, --files-per-category` | Number of files per category | 1 |
@@ -133,6 +134,30 @@ The tool automatically maps tinnitus frequencies to appropriate frequency band p
 | FB5-FB6 | 4000-8000 Hz | High frequency range |
 | FB6-FB7 | 5657-11314 Hz | Very high frequency range |
 | FB7-FB8 | 8000-16000 Hz | Ultra-high frequency range |
+
+#### Frequency Band Selection
+
+**Automatic Selection (`-f, --frequency`)**
+The tool automatically determines the optimal frequency band pair based on the tinnitus frequency using logarithmic centering. For example:
+```bash
+python tinnitus_sound_therapy.py -f 3000  # Automatically selects FB4-FB5
+```
+
+**Manual Selection (`--mod-band`)**
+For clinical applications, you may need to manually select a specific frequency band, e.g. when the automatically selected _best_ band for the tinnitus frequency contains frequencies not heard by the subject.
+
+It can also be useful for generating _sham_ files for clinical studies (where the modulated frequencies are not close to the tinnitus frequency).
+
+```bash
+# Direct band selection when automatic choice isn't suitable
+python tinnitus_sound_therapy.py --mod-band FB3  # Force FB3-FB4 bands
+
+# Example: 4 kHz tinnitus might auto-select FB4-FB5, but patient has hearing loss there
+python tinnitus_sound_therapy.py -f 4000        # Auto-selects FB4-FB5 (2828-5657 Hz)
+python tinnitus_sound_therapy.py --mod-band FB3 # Manual override to FB3-FB4 (2000-4000 Hz)
+```
+
+**Note**: Only one frequency selection method can be used per command (`--frequency` OR `--mod-band`, not both).
 
 #### Modulation Types
 
@@ -170,6 +195,14 @@ python tinnitus_sound_therapy.py --all -o full_experiment
 
 # Use random filenames for blinded studies
 python tinnitus_sound_therapy.py -f 8000 --random-names
+
+# Direct band selection examples
+python tinnitus_sound_therapy.py --mod-band FB3 -m amp               # Direct FB3-FB4 selection
+python tinnitus_sound_therapy.py --mod-band FB5 --hearing-profile SevHL -d 30  # FB5-FB6 with severe HL correction
+
+# Clinical scenario: Patient has 4 kHz tinnitus but high-frequency hearing loss
+python tinnitus_sound_therapy.py -f 4000 -m amp                     # Auto-selects FB4-FB5 (2828-5657 Hz)
+python tinnitus_sound_therapy.py --mod-band FB3 -m amp              # Manual override to FB3-FB4 (2000-4000 Hz)
 ```
 
 #### Output Files
