@@ -391,10 +391,9 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
     n_per_file = max(1, int(duration_seconds / 4))  # At least 1 stimulus
 
     # Frequency bands setup - exactly matching MatLab
-    fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
-    fbands = [[fb[i], fb[i+1]] for i in range(8)]  # 8 frequency bands
+    fb = band_separation_frequencies() 
+    fbands = frequency_bands(fb)
 
-    fhz = 1000 * (2 ** np.arange(0, 4.25, 0.25))
     hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
     hl_corr_temp_fbands = hl_corr_temp[1::2]  # Every second element starting from index 1
 
@@ -483,10 +482,9 @@ def generate_full_experiment_stimuli_updated(loud: float = 0.1, files_per_catego
     n_per_file = 900  # 60 minutes exactly
 
     # Frequency bands setup - exactly matching MatLab
-    fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
-    fbands = [[fb[i], fb[i+1]] for i in range(8)]  # 8 frequency bands
+    fb = band_separation_frequencies() 
+    fbands = frequency_bands(fb)
 
-    fhz = 1000 * (2 ** np.arange(0, 4.25, 0.25))
     hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
     hl_corr_temp_fbands = hl_corr_temp[1::2]  # Every second element starting from index 1
 
@@ -559,10 +557,9 @@ def test_experimental_stimuli_generation(n_per_file: int = 2) -> None:
     loud = 0.1
 
     # Frequency bands setup - reduced set
-    fb = 1000 * (2 ** np.arange(0, 2.5, 0.5))  # Only up to 4 kHz
-    fbands = [[fb[i], fb[i+1]] for i in range(4)]  # 4 bands: 1-1.4, 1.4-2, 2-2.8, 2.8-4 kHz
+    fb = band_separation_frequencies() 
+    fbands = frequency_bands(fb)
 
-    fhz = 1000 * (2 ** np.arange(0, 2.25, 0.25))
     hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 1.25, 0.25)]) / 2
     hl_corr_temp_fbands = hl_corr_temp[1::2][:len(fbands)]  # Match fbands length
 
@@ -638,9 +635,8 @@ def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int 
     f0_range = [96, 256]
     n_per_file = 900  # 60 minutes exactly
 
-    fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
-    fbands = [[fb[i], fb[i+1]] for i in range(8)]  # Frequency bands to apply modulation
-    fhz = 1000 * (2 ** np.arange(0, 4.25, 0.25))
+    fb = band_separation_frequencies() 
+    fbands = frequency_bands(fb)
     hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
     hl_corr_temp_fbands = hl_corr_temp[1::2]  # Every second element starting from index 1
     hl_corr_vals = [0, 15, 30, 45]  # Maximum (dB) correction difference between 8 kHz and 1 kHz
@@ -697,7 +693,7 @@ def generate_hearing_tinnitus_estimation_stimuli() -> None:
     """
     rms = 0.01
     srate = 44100
-    fhz = 1000 * (2 ** np.arange(0, 4.25, 0.25))  # 1-16 kHz in 1/4 octave steps
+    fhz = band_separation_frequencies()  # 1-16 kHz in 1/4 octave steps
     bw = 0.5  # Bandwidth (oct) of NBN stimuli
     ramp = 10
     stim_dur = 1
@@ -793,18 +789,26 @@ def create_example_stimulus(f0: float = 150, mod_type: str = 'amp', duration: fl
 
     return stimulus
 
+def band_separation_frequencies() -> List[float]:
+    return 1000 * (2 ** np.arange(0, 4.5, 0.5))
 
-def frequency_to_band_index(frequency_hz: float, prefer_lower: bool = False) -> int:
+def frequency_bands(fb: List[float]) -> List[List[float]]:
+    return [[fb[i], fb[i+1]] for i in range(8)]
+
+def band_breakpoints() -> List[float]:
+    """division points to assign frequencies to the band that contains closest to its center"""
+    return 1000 * (2 ** (np.arange(3, 17, 2) / 4.0))
+
+def frequency_to_band_index(frequency_hz: float) -> int:
     """
     Convert a tinnitus frequency to the appropriate frequency band pair index
 
     The modulation uses consecutive pairs of frequency bands. This function determines
     which pair index should be used such that fband_mod = [index, index+1] will
-    modulate the appropriate bands containing the target frequency.
+    modulate the appropriate bands containing the target frequency closest to the logarithmic center of the band.
 
     Args:
         frequency_hz: tinnitus frequency in Hz
-        prefer_lower: if True, prefer lower band pair when frequency is on boundary (default: False, prefer higher)
 
     Returns:
         band pair index (0-6) where:
@@ -819,63 +823,14 @@ def frequency_to_band_index(frequency_hz: float, prefer_lower: bool = False) -> 
     Raises:
         ValueError: if frequency is outside the supported range
     """
-
-    # Frequency bands setup - exactly matching MatLab
-    fb = 1000 * (2 ** np.arange(0, 4.5, 0.5))
-    fbands = [[fb[i], fb[i+1]] for i in range(8)]  # 8 individual frequency bands
-
-    # Create consecutive band pairs (FB1-FB2, FB2-FB3, etc.)
-    band_pairs = []
-    for i in range(7):  # 7 possible pairs
-        pair_low = fbands[i][0]     # Start of first band
-        pair_high = fbands[i+1][1]  # End of second band
-        band_pairs.append([pair_low, pair_high])
-
-    # Find which band pairs contain the frequency
-    containing_pairs = []
-    for i, (low, high) in enumerate(band_pairs):
-        if low <= frequency_hz <= high:
-            containing_pairs.append(i)
-
-    if not containing_pairs:
-        # Show available frequency ranges for better error message
-        ranges = [f"FB{i+1}-FB{i+2}: {band_pairs[i][0]:.0f}-{band_pairs[i][1]:.0f} Hz" for i in range(7)]
-        raise ValueError(f"Frequency {frequency_hz} Hz is outside supported range. "
-                        f"Supported ranges: {', '.join(ranges)}")
-
-    if len(containing_pairs) == 1:
-        return containing_pairs[0]
-    else:
-        # Multiple pairs contain this frequency (on boundary)
-        # Implement logarithmic centering: select band where frequency is most centered logarithmically
-        # Criterion: minimize |hi/f - f/lo| which is equivalent to making hi*lo/f² closest to 1
-
-        best_pair = containing_pairs[0]
-        best_centering = float('inf')
-
-        for pair_idx in containing_pairs:
-            low, high = band_pairs[pair_idx]
-            # Calculate logarithmic centering metric: how close hi*lo/f² is to 1
-            centering_metric = abs((high * low) / (frequency_hz ** 2) - 1)
-
-            if centering_metric < best_centering:
-                best_centering = centering_metric
-                best_pair = pair_idx
-
-        # If prefer_lower is True and the lower band also contains the frequency,
-        # check if we should override the logarithmic choice
-        if prefer_lower:
-            lower_pair = min(containing_pairs)
-            if lower_pair != best_pair:
-                # The lower pair is different from the logarithmically best one
-                # Use the lower pair as requested
-                return lower_pair
-
-        return best_pair
+    bandbreakpoints = band_breakpoints()
+    for i in range(len(bandbreakpoints)):
+        if frequency_hz <= bandbreakpoints[i]:
+            break
+    return i
 
 
 def generate_cli_stimuli(frequency_hz: Optional[float] = None,
-                        prefer_lower_band: bool = False,
                         mod_types: Optional[List[str]] = None,
                         hearing_profiles: Optional[List[str]] = None,
                         files_per_category: int = 1,
@@ -890,7 +845,6 @@ def generate_cli_stimuli(frequency_hz: Optional[float] = None,
 
     Args:
         frequency_hz: target tinnitus frequency in Hz (None = all bands)
-        prefer_lower_band: prefer lower band when frequency is on boundary
         mod_types: list of modulation types or None for all
         hearing_profiles: list of hearing profiles or None for ['NH']
         files_per_category: number of files per category
@@ -925,7 +879,7 @@ def generate_cli_stimuli(frequency_hz: Optional[float] = None,
     # Determine frequency bands to generate
     if frequency_hz is not None:
         try:
-            band_index = frequency_to_band_index(frequency_hz, prefer_lower_band)
+            band_index = frequency_to_band_index(frequency_hz)
             band_indices = [band_index]
             print(f"Target frequency: {frequency_hz} Hz → FB{band_index+1}-FB{band_index+2}")
         except ValueError as e:
@@ -999,7 +953,6 @@ def main():
 Examples:
   %(prog)s --all                              # Generate all 84 files
   %(prog)s -f 3000                           # Generate for 3 kHz tinnitus
-  %(prog)s -f 2000 --prefer-lower            # 2 kHz, prefer lower band
   %(prog)s -f 4000 -m amp phase              # 4 kHz, amplitude and phase only
   %(prog)s -f 1500 --hearing-profile NH MildHL              # 1.5 kHz, normal and mild HL
   %(prog)s -f 8000 -n 3 -o therapy_files                 # 8 kHz, 3 files per category
@@ -1022,12 +975,6 @@ Frequency Band Mapping:
         "-f", "--frequency",
         type=float,
         help="Tinnitus frequency in Hz (determines frequency band)"
-    )
-
-    parser.add_argument(
-        "--prefer-lower",
-        action="store_true",
-        help="When frequency is on band boundary, prefer lower band (default: prefer higher)"
     )
 
     parser.add_argument(
@@ -1108,7 +1055,6 @@ Frequency Band Mapping:
 
         generate_cli_stimuli(
             frequency_hz=args.frequency,
-            prefer_lower_band=args.prefer_lower,
             mod_types=args.modulation,
             hearing_profiles=args.hearing_profile,
             files_per_category=args.files_per_category,
