@@ -10,9 +10,130 @@ Original article: DOI: https://doi.org/10.25405/data.ncl.27109693
 
 import numpy as np
 import soundfile as sf
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, Dict
 import random
 import os
+
+
+class HearingLossCorrection:
+    """
+    Encapsulates hearing loss correction parameters and methods.
+
+    This class manages the hearing loss correction profiles, templates, and values
+    used throughout the tinnitus sound therapy system.
+    """
+
+    def __init__(self):
+        # Hearing loss correction labels and their maximum correction values (dB)
+        self._correction_values = {
+            'NH': 0,        # Normal Hearing
+            'MildHL': 15,   # Mild Hearing Loss
+            'ModHL': 30,    # Moderate Hearing Loss
+            'SevHL': 45     # Severe Hearing Loss
+        }
+
+        # Template for HFHL correction, beginning from 2 kHz. Flat beyond 8kHz
+        # This represents the frequency-dependent correction pattern
+        self._correction_template = np.concatenate([
+            [0, 0, 0, 0],           # Flat correction below 2 kHz
+            np.arange(0, 2.25, 0.25), # Progressive correction 2-8 kHz
+            [2, 2, 2, 2]            # Flat correction above 8 kHz
+        ]) / 2
+
+        # Extract template values for frequency bands (every second element starting from index 1)
+        self._template_fbands = self._correction_template[1::2]
+
+    @property
+    def labels(self) -> List[str]:
+        """Get list of hearing loss profile labels."""
+        return list(self._correction_values.keys())
+
+    @property
+    def values(self) -> List[int]:
+        """Get list of maximum correction values in dB."""
+        return list(self._correction_values.values())
+
+    @property
+    def correction_dict(self) -> Dict[str, int]:
+        """Get dictionary mapping labels to correction values."""
+        return self._correction_values.copy()
+
+    @property
+    def template(self) -> np.ndarray:
+        """Get the frequency-dependent correction template."""
+        return self._correction_template.copy()
+
+    @property
+    def template_fbands(self) -> np.ndarray:
+        """Get the template values for frequency bands."""
+        return self._template_fbands.copy()
+
+    def get_correction_value(self, profile: str) -> int:
+        """
+        Get the maximum correction value for a given hearing profile.
+
+        Args:
+            profile: Hearing loss profile ('NH', 'MildHL', 'ModHL', 'SevHL')
+
+        Returns:
+            Maximum correction value in dB
+
+        Raises:
+            ValueError: If profile is not recognized
+        """
+        if profile not in self._correction_values:
+            valid_profiles = ', '.join(self.labels)
+            raise ValueError(f"Invalid hearing profile '{profile}'. Valid options: {valid_profiles}")
+        return self._correction_values[profile]
+
+    def get_band_corrections(self, profile: str) -> np.ndarray:
+        """
+        Get frequency band correction values for a given hearing profile.
+
+        Args:
+            profile: Hearing loss profile ('NH', 'MildHL', 'ModHL', 'SevHL')
+
+        Returns:
+            Array of correction values in dB for each frequency band
+        """
+        max_correction = self.get_correction_value(profile)
+        return self._template_fbands * max_correction
+
+    def get_frequency_correction(self, profile: str, frequency_index: int) -> float:
+        """
+        Get correction value for a specific frequency index and hearing profile.
+
+        Args:
+            profile: Hearing loss profile ('NH', 'MildHL', 'ModHL', 'SevHL')
+            frequency_index: Index into the frequency template
+
+        Returns:
+            Correction value in dB for the specified frequency
+        """
+        max_correction = self.get_correction_value(profile)
+        if frequency_index >= len(self._correction_template):
+            raise IndexError(f"Frequency index {frequency_index} out of range")
+        return self._correction_template[frequency_index] * max_correction
+
+    def validate_profile(self, profile: str) -> bool:
+        """
+        Check if a hearing loss profile is valid.
+
+        Args:
+            profile: Hearing loss profile to validate
+
+        Returns:
+            True if profile is valid, False otherwise
+        """
+        return profile in self._correction_values
+
+    def __len__(self) -> int:
+        """Return number of hearing loss profiles."""
+        return len(self._correction_values)
+
+    def __iter__(self):
+        """Iterate over hearing loss profile labels."""
+        return iter(self.labels)
 
 
 def farpn(srate: int, low_f: float, high_f: float, dur: float) -> np.ndarray:
@@ -372,16 +493,18 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
     import os
     from tqdm import tqdm
 
+    # Initialize hearing loss correction
+    hl_correction = HearingLossCorrection()
+
     # Validate inputs
     valid_mod_types = ['noise', 'amp', 'phase']
-    valid_hearing_profiles = ['NH', 'MildHL', 'ModHL', 'SevHL']
 
     if mod_type not in valid_mod_types:
         raise ValueError(f"mod_type must be one of {valid_mod_types}, got '{mod_type}'")
     if fband_index < 0 or fband_index > 6:
         raise ValueError(f"fband_index must be 0-6 (FB1-FB7), got {fband_index}")
-    if hearing_profile not in valid_hearing_profiles:
-        raise ValueError(f"hearing_profile must be one of {valid_hearing_profiles}, got '{hearing_profile}'")
+    if not hl_correction.validate_profile(hearing_profile):
+        raise ValueError(f"hearing_profile must be one of {hl_correction.labels}, got '{hearing_profile}'")
 
     # Parameters from MatLab implementation
     srate = 44100
@@ -397,10 +520,6 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
     fb = band_separation_frequencies() 
     fbands = frequency_bands(fb)
 
-    hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
-    hl_corr_temp_fbands = hl_corr_temp[1::2]  # Every second element starting from index 1
-
-    hl_corr_vals = {'NH': 0, 'MildHL': 15, 'ModHL': 30, 'SevHL': 45}
 
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -433,7 +552,7 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
     for s in iterator:
         dur_tmp = np.round(10 * (min(dur_range) + np.random.rand() * np.diff(dur_range)[0])) / 10
         f0_tmp = int(np.round(min(f0_range) + np.random.rand() * np.diff(f0_range)[0]))
-        fband_db = hl_corr_temp_fbands * hl_corr_vals[hearing_profile]
+        fband_db = hl_correction.get_band_corrections(hearing_profile)
         fband_mod = [fband_index, fband_index + 1]  # Use adjacent frequency bands
 
         stim_tmp = mod_ripple(
@@ -484,6 +603,9 @@ def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int 
 
     William Sedley - Last updated September 2024
     """
+    # Initialize hearing loss correction
+    hl_correction = HearingLossCorrection()
+
     srate = 44100
     mod_type = ['noise', 'amp', 'phase']
     dur_range = [4, 4]
@@ -492,37 +614,31 @@ def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int 
     n_per_file = 900  # 60 minutes exactly
 
     # Frequency bands setup - exactly matching MatLab
-    fb = band_separation_frequencies() 
+    fb = band_separation_frequencies()
     fbands = frequency_bands(fb)
 
-    hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
-    hl_corr_temp_fbands = hl_corr_temp[1::2]  # Every second element starting from index 1
-
-    hl_corr_vals = [0, 15, 30, 45]  # Maximum (dB) correction difference between 8 kHz and 1 kHz
-    hl_corr_labels = ['NH', 'MildHL', 'ModHL', 'SevHL']
-
     if randnames:
-        ntot = len(mod_type) * (len(fbands) - 1) * len(hl_corr_vals) * files_per_category
+        ntot = len(mod_type) * (len(fbands) - 1) * len(hl_correction) * files_per_category
         rnames = np.random.permutation(ntot) + 1  # +1 to match MatLab 1-indexing
         file_key = []
 
     print(f"Generating experimental stimuli...")
-    print(f"Total files to generate: {len(mod_type) * (len(fbands) - 1) * len(hl_corr_vals) * files_per_category}")
+    print(f"Total files to generate: {len(mod_type) * (len(fbands) - 1) * len(hl_correction) * files_per_category}")
     print(f"This will take some time...")
 
     file_count = 0
-    total_files = len(mod_type) * (len(fbands) - 1) * len(hl_corr_vals) * files_per_category
+    total_files = len(mod_type) * (len(fbands) - 1) * len(hl_correction) * files_per_category
 
     for m in range(len(mod_type)):
         for b in range(len(fbands) - 1):  # -1 because we use pairs of adjacent bands
-            for h in range(len(hl_corr_vals)):
+            for h, hearing_profile in enumerate(hl_correction):
                 for f in range(files_per_category):
                     # Use the single stimulus generation function
                     try:
                         filepath = generate_single_experiment_stimulus(
                             mod_type=mod_type[m],
                             fband_index=b,
-                            hearing_profile=hl_corr_labels[h],
+                            hearing_profile=hearing_profile,
                             file_number=f + 1,
                             loud=loud,
                             output_dir=".",  # Current directory
@@ -534,14 +650,14 @@ def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int 
                         if randnames:
                             # For consistency with original behavior, track the mapping
                             import os
-                            fname_tmp = f"{mod_type[m]}_FB{b+1}_{hl_corr_labels[h]}_{f+1}.wav"
+                            fname_tmp = f"{mod_type[m]}_FB{b+1}_{hearing_profile}_{f+1}.wav"
                             file_key.append([fname_tmp, os.path.basename(filepath)])
 
                         file_count += 1
                         print(f"Progress: {file_count}/{total_files} files completed")
 
                     except Exception as e:
-                        print(f"Error generating {mod_type[m]}_FB{b+1}_{hl_corr_labels[h]}_{f+1}: {e}")
+                        print(f"Error generating {mod_type[m]}_FB{b+1}_{hearing_profile}_{f+1}: {e}")
                         continue
 
     if randnames:
@@ -610,6 +726,9 @@ def generate_hearing_assessment_stimuli(output_dir: str = ".",
         file_format: audio file format - "wav" or "mp4" (default: "wav")
         verbose: whether to print progress information (default: True)
     """
+    # Initialize hearing loss correction
+    hl_correction = HearingLossCorrection()
+
     # Parameters from MatLab implementation
     rms = 0.01
     srate = 44100
@@ -618,11 +737,6 @@ def generate_hearing_assessment_stimuli(output_dir: str = ".",
     ramp = 10  # Ramp duration (ms)
     stim_dur = 1  # Duration of each stimulus (s)
     isi = 1  # Inter-stimulus interval (s)
-
-    # Hearing loss correction template and values
-    hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
-    hl_corr_vals = [0, 15, 30, 45]  # Maximum (dB) correction difference between 8 kHz and 1 kHz
-    hl_corr_labels = ['NH', 'MildHL', 'ModHL', 'SevHL']
 
     gen_ext = 'Hearing_Tinnitus_Estimation_Stimuli'
     type_ext = ['PT', 'NBN']
@@ -652,22 +766,22 @@ def generate_hearing_assessment_stimuli(output_dir: str = ".",
         print("Generating Hearing Assessment Stimuli")
         print("=" * 50)
         print(f"Frequencies: {len(fhz)} steps from {fhz[0]:.0f} to {fhz[-1]:.0f} Hz")
-        print(f"Hearing profiles: {len(hl_corr_labels)} ({', '.join(hl_corr_labels)})")
+        print(f"Hearing profiles: {len(hl_correction)} ({', '.join(hl_correction.labels)})")
         print(f"Stimulus types: {len(type_ext)} ({', '.join(type_ext)})")
-        print(f"Total files to generate: {len(hl_corr_labels) * len(type_ext)}")
+        print(f"Total files to generate: {len(hl_correction) * len(type_ext)}")
         print(f"Output directory: {output_dir}")
         print(f"File format: {file_format}")
         print()
 
     file_count = 0
-    total_files = len(hl_corr_labels) * len(type_ext)
+    total_files = len(hl_correction) * len(type_ext)
 
-    for c in range(len(hl_corr_labels)):
+    for c, hearing_profile in enumerate(hl_correction):
         for t in range(len(type_ext)):  # 0 = PT, 1 = NBN
             stim_all = []
 
             if verbose:
-                print(f"Generating {type_ext[t]} stimuli for {hl_corr_labels[c]} profile...")
+                print(f"Generating {type_ext[t]} stimuli for {hearing_profile} profile...")
 
             for n in range(len(fhz)):
                 if t == 0:  # Pure tone (PT)
@@ -682,7 +796,7 @@ def generate_hearing_assessment_stimuli(output_dir: str = ".",
                 stim_tmp = wind_ramp(srate, ramp, stim_tmp)
 
                 # Apply hearing loss correction
-                correction_db = hl_corr_temp[n] * hl_corr_vals[c]
+                correction_db = hl_correction.get_frequency_correction(hearing_profile, n)
                 stim_tmp = stim_tmp * (10 ** (correction_db / 20))
 
                 # Add stimulus and silent interval
@@ -698,7 +812,7 @@ def generate_hearing_assessment_stimuli(output_dir: str = ".",
                     print('  Downscaling to prevent clipping.')
 
             # Generate filename and save
-            filename = f"{gen_ext}_{type_ext[t]}_{hl_corr_labels[c]}.{file_format}"
+            filename = f"{gen_ext}_{type_ext[t]}_{hearing_profile}.{file_format}"
             filepath = os.path.join(output_dir, filename)
 
             sf.write(filepath, stim_all, srate)
@@ -854,6 +968,9 @@ def main():
     import argparse
     import sys
 
+    # Initialize hearing loss correction for CLI validation
+    hl_correction = HearingLossCorrection()
+
     parser = argparse.ArgumentParser(
         description="Generate tinnitus sound therapy stimuli",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -910,7 +1027,7 @@ Frequency Band Mapping:
 
     parser.add_argument(
         "--hearing-profile",
-        choices=["NH", "MildHL", "ModHL", "SevHL"],
+        choices=hl_correction.labels,
         nargs="+",
         default=["NH"],
         help="Hearing loss profile(s) (default: NH only)"
