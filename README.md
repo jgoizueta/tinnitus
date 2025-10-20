@@ -17,6 +17,14 @@ The Python program `tinnitus_sound_therapy.py` provides a comprehensive CLI tool
 * **Therapeutic stimuli**: Based on the original `Generate_Full_Experiment_Stimuli` MatLab implementation, generating the full set of experimental files or specific files for given tinnitus frequency, hearing loss, etc.
 * **Hearing assessment stimuli**: Based on the original `Hearing_Tin_Stim_Generation.m` MatLab file, generating files for assessment of tinnitus frequency and hearing loss slope.
 
+## Example Output
+
+The following spectrogram shows an example of generated therapeutic stimulus with amplitude modulation in the FB6 frequency band (5.7-11 kHz) with mild hearing loss correction:
+
+![Example Spectrogram](amp_FB6_MildHL_spectrogram.png)
+
+*Example: `amp_FB6_MildHL_1.wav` - Shows the characteristic spectral ripple pattern with amplitude modulation in the target frequency bands and hearing loss compensation applied across the frequency spectrum.*
+
 ## ⚠️ Disclaimer
 
 **This software is provided for research and educational purposes only.**
