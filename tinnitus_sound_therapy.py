@@ -12,6 +12,7 @@ import numpy as np
 import soundfile as sf
 from typing import List, Tuple, Union, Optional
 import random
+import os
 
 
 def farpn(srate: int, low_f: float, high_f: float, dur: float) -> np.ndarray:
@@ -551,7 +552,7 @@ def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int 
 
 
 def band_separation_frequencies() -> List[float]:
-    return 1000 * (2 ** np.arange(0, 4.5, 0.5))
+    return 1000 * (2 ** np.arange(0, 4.5, 0.5))  # 1-16 kHz in 1/4 octave steps
 
 
 def frequency_bands(fb: List[float]) -> List[List[float]]:
@@ -592,6 +593,137 @@ def frequency_to_band_index(frequency_hz: float) -> int:
         if frequency_hz <= bandbreakpoints[i]:
             break
     return i
+
+
+def generate_hearing_assessment_stimuli(output_dir: str = ".",
+                                       file_format: str = "wav",
+                                       verbose: bool = True) -> None:
+    """
+    Generate hearing and tinnitus frequency estimation stimuli
+
+    This function generates test stimuli exactly matching the MatLab implementation.
+    Creates PT (Pure Tone) and NBN (Narrowband Noise) stimuli for different
+    hearing loss correction profiles.
+
+    Args:
+        output_dir: directory to save generated files (default: current directory)
+        file_format: audio file format - "wav" or "mp4" (default: "wav")
+        verbose: whether to print progress information (default: True)
+    """
+    # Parameters from MatLab implementation
+    rms = 0.01
+    srate = 44100
+    fhz = band_separation_frequencies()
+    bw = 0.5  # Bandwidth (oct) of NBN stimuli
+    ramp = 10  # Ramp duration (ms)
+    stim_dur = 1  # Duration of each stimulus (s)
+    isi = 1  # Inter-stimulus interval (s)
+
+    # Hearing loss correction template and values
+    hl_corr_temp = np.concatenate([[0, 0, 0, 0], np.arange(0, 2.25, 0.25), [2, 2, 2, 2]]) / 2
+    hl_corr_vals = [0, 15, 30, 45]  # Maximum (dB) correction difference between 8 kHz and 1 kHz
+    hl_corr_labels = ['NH', 'MildHL', 'ModHL', 'SevHL']
+
+    gen_ext = 'Hearing_Tinnitus_Estimation_Stimuli'
+    type_ext = ['PT', 'NBN']
+
+    # Create time vectors
+    tvec = np.arange(1/srate, stim_dur + 1/srate, 1/srate)
+    zvec = np.zeros(int(stim_dur * srate))  # Silent interval
+    bw_mults = 2 ** (np.array([-0.5, 0.5]) * bw)
+
+    # Validate file format and adjust if needed
+    supported_formats = ['wav', 'flac', 'ogg']
+    if file_format == 'mp4':
+        if verbose:
+            print("Warning: MP4 format not supported by Python soundfile library.")
+            print("Converting to WAV format for compatibility.")
+        file_format = 'wav'
+    elif file_format not in supported_formats:
+        if verbose:
+            print(f"Warning: Format '{file_format}' may not be supported.")
+            print(f"Supported formats: {', '.join(supported_formats)}")
+            print("Proceeding with requested format...")
+
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    if verbose:
+        print("Generating Hearing Assessment Stimuli")
+        print("=" * 50)
+        print(f"Frequencies: {len(fhz)} steps from {fhz[0]:.0f} to {fhz[-1]:.0f} Hz")
+        print(f"Hearing profiles: {len(hl_corr_labels)} ({', '.join(hl_corr_labels)})")
+        print(f"Stimulus types: {len(type_ext)} ({', '.join(type_ext)})")
+        print(f"Total files to generate: {len(hl_corr_labels) * len(type_ext)}")
+        print(f"Output directory: {output_dir}")
+        print(f"File format: {file_format}")
+        print()
+
+    file_count = 0
+    total_files = len(hl_corr_labels) * len(type_ext)
+
+    for c in range(len(hl_corr_labels)):
+        for t in range(len(type_ext)):  # 0 = PT, 1 = NBN
+            stim_all = []
+
+            if verbose:
+                print(f"Generating {type_ext[t]} stimuli for {hl_corr_labels[c]} profile...")
+
+            for n in range(len(fhz)):
+                if t == 0:  # Pure tone (PT)
+                    stim_tmp = np.sin(2 * np.pi * fhz[n] * tvec)
+                else:  # Narrowband noise (NBN)
+                    stim_tmp = farpn(srate, fhz[n] * bw_mults[0], fhz[n] * bw_mults[1], stim_dur)
+
+                # Normalize to target RMS
+                stim_tmp = stim_tmp * rms / np.std(stim_tmp)
+
+                # Apply ramping
+                stim_tmp = wind_ramp(srate, ramp, stim_tmp)
+
+                # Apply hearing loss correction
+                correction_db = hl_corr_temp[n] * hl_corr_vals[c]
+                stim_tmp = stim_tmp * (10 ** (correction_db / 20))
+
+                # Add stimulus and silent interval
+                stim_all.extend(stim_tmp)
+                stim_all.extend(zvec)
+
+            # Convert to numpy array and check for clipping
+            stim_all = np.array(stim_all)
+            maxabs = np.max(np.abs(stim_all))
+            if maxabs > 0.9:
+                stim_all = stim_all / (maxabs * 1.1)
+                if verbose:
+                    print('  Downscaling to prevent clipping.')
+
+            # Generate filename and save
+            filename = f"{gen_ext}_{type_ext[t]}_{hl_corr_labels[c]}.{file_format}"
+            filepath = os.path.join(output_dir, filename)
+
+            sf.write(filepath, stim_all, srate)
+
+            file_count += 1
+            if verbose:
+                duration_min = len(stim_all) / srate / 60
+                print(f"  Generated: {filename} ({duration_min:.1f} minutes, {file_count}/{total_files})")
+
+    if verbose:
+        print()
+        print("=" * 50)
+        print("Hearing assessment stimuli generation completed!")
+        print(f"Generated {file_count} files in {output_dir}")
+        print()
+        print("File description:")
+        print("- PT files: Pure tone stimuli (sine waves)")
+        print("- NBN files: Narrowband noise stimuli")
+        print("- NH: Normal Hearing (no correction)")
+        print("- MildHL: Mild Hearing Loss (15 dB max correction)")
+        print("- ModHL: Moderate Hearing Loss (30 dB max correction)")
+        print("- SevHL: Severe Hearing Loss (45 dB max correction)")
+        print()
+        print("Each file contains 17 frequencies from 1-16 kHz in 1/4 octave steps")
+        print("with 1-second stimuli separated by 1-second silent intervals.")
 
 
 def generate_cli_stimuli(frequency_hz: Optional[float] = None,
@@ -728,11 +860,13 @@ def main():
         epilog="""
 Examples:
   %(prog)s --all                              # Generate all 84 files
+  %(prog)s --assessment-stimuli               # Generate 8 hearing assessment files
   %(prog)s -f 3000                           # Generate for 3 kHz tinnitus
   %(prog)s --mod-band FB4                    # Generate for FB4-FB5 bands directly
   %(prog)s -f 4000 -m amp phase              # 4 kHz, amplitude and phase only
   %(prog)s -f 1500 --hearing-profile NH MildHL              # 1.5 kHz, normal and mild HL
   %(prog)s -f 8000 -n 3 -o therapy_files                 # 8 kHz, 3 files per category
+  %(prog)s --assessment-stimuli --format flac -q -o hearing_tests  # Assessment stimuli in FLAC format
   %(prog)s --mod-band FB2 -m noise --hearing-profile SevHL  # Direct band selection with modulation
 
 Frequency Band Mapping:
@@ -746,6 +880,12 @@ Frequency Band Mapping:
         "--all",
         action="store_true",
         help="Generate all experimental stimuli (84 files, ~60GB)"
+    )
+
+    parser.add_argument(
+        "--assessment-stimuli",
+        action="store_true",
+        help="Generate hearing assessment stimuli (8 files for frequency estimation)"
     )
 
     parser.add_argument(
@@ -791,6 +931,13 @@ Frequency Band Mapping:
     )
 
     parser.add_argument(
+        "--format",
+        choices=["wav", "flac", "ogg", "mp4"],
+        default="wav",
+        help="Audio file format for assessment stimuli (default: wav). Note: mp4 will be converted to wav."
+    )
+
+    parser.add_argument(
         "--prefix",
         default="",
         help="Prefix for generated filenames"
@@ -800,6 +947,12 @@ Frequency Band Mapping:
         "--random-names",
         action="store_true",
         help="Use random filenames instead of descriptive names"
+    )
+
+    parser.add_argument(
+        "-q", "--quiet",
+        action="store_true",
+        help="Suppress progress output for assessment stimuli"
     )
 
     parser.add_argument(
@@ -820,17 +973,18 @@ Frequency Band Mapping:
     args = parser.parse_args()
 
     # Validate arguments
-    if not args.all and args.frequency is None and args.mod_band is None:
-        parser.error("Must specify either --all, -f/--frequency, or --mod-band")
+    if not args.all and not args.assessment_stimuli and args.frequency is None and args.mod_band is None:
+        parser.error("Must specify either --all, --assessment-stimuli, -f/--frequency, or --mod-band")
 
     # Check for mutual exclusivity
     specified_options = sum([
         args.all,
+        args.assessment_stimuli,
         args.frequency is not None,
         args.mod_band is not None
     ])
     if specified_options > 1:
-        parser.error("Cannot specify more than one of: --all, -f/--frequency, --mod-band")
+        parser.error("Cannot specify more than one of: --all, --assessment-stimuli, -f/--frequency, --mod-band")
 
     if args.files_per_category < 1:
         parser.error("files-per-category must be >= 1")
@@ -841,6 +995,15 @@ Frequency Band Mapping:
     try:
         print("Tinnitus Sound Therapy - Python Implementation")
         print("=" * 50)
+
+        # Handle assessment stimuli generation
+        if args.assessment_stimuli:
+            generate_hearing_assessment_stimuli(
+                output_dir=args.output_dir,
+                file_format=args.format,
+                verbose=not args.quiet
+            )
+            return
 
         generate_cli_stimuli(
             frequency_hz=args.frequency,

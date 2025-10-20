@@ -12,9 +12,10 @@ This is a Python port of the MatLab code for generating audio stimulus files for
 
 ## Overview
 
-The Python programs here generate two kind of audio files:
-* `hearing_assessment_stimuli.py` generates files intended for assessment of the tinnitus frequency and hearing loss slope. It reproduces the functionality of the original `Hearing_Tin_Stim_Generation.m` MatLab file.
-* `tinnitus_sound_therapy.py` generates the therapeutic stimuli, as the original `Generate_Full_Experiment_Stimuli` and it can either generate the full set of files or specific files for given tinnitus frequency, hearing loss, etc.
+The Python program `tinnitus_sound_therapy.py` provides a comprehensive CLI tool for generating audio files for tinnitus research and therapy. It can generate:
+
+* **Therapeutic stimuli**: Based on the original `Generate_Full_Experiment_Stimuli` MatLab implementation, generating the full set of experimental files or specific files for given tinnitus frequency, hearing loss, etc.
+* **Hearing assessment stimuli**: Based on the original `Hearing_Tin_Stim_Generation.m` MatLab file, generating files for assessment of tinnitus frequency and hearing loss slope.
 
 
 ## Installation
@@ -81,19 +82,18 @@ This project supports both traditional pip and modern uv package management.
 
 ### Project files
 
-- `tinnitus_sound_therapy.py` - Main CLI tool for generating therapeutic stimuli
-- `hearing_assessment_stimuli.py` - CLI tool for hearing assessment stimuli generation
+- `tinnitus_sound_therapy.py` - Main CLI tool for generating therapeutic and assessment stimuli
 - `test_implementation.py` - Test suite to verify functionality
 - `requirements.txt` - Python dependencies for pip
 - `pyproject.toml` - Modern Python project configuration for uv
 
 ## Usage
 
-This project provides two CLI tools for generating different types of audio stimuli for tinnitus research and therapy.
+This project provides a comprehensive CLI tool for generating different types of audio stimuli for tinnitus research and therapy.
 
-### 1. Therapeutic Stimuli Generation (`tinnitus_sound_therapy.py`)
+### 1. Therapeutic Stimuli Generation
 
-This is the main tool for generating therapeutic audio stimuli with various modulation types.
+The main tool can generate therapeutic audio stimuli with various modulation types using frequency or band-specific targeting.
 
 #### Basic Usage
 
@@ -110,14 +110,17 @@ uv run python tinnitus_sound_therapy.py -f 3000
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--all` | Generate all experimental stimuli (84 files, ~60GB) | - |
+| `--assessment-stimuli` | Generate hearing assessment stimuli (8 files for frequency estimation) | - |
 | `-f, --frequency` | Tinnitus frequency in Hz (determines frequency band) | - |
 | `--mod-band` | Direct frequency band selection (FB1-FB7, alternative to --frequency) | - |
 | `-m, --modulation` | Modulation type(s): `noise`, `amp`, `phase` | All types |
 | `--hearing-profile` | Hearing loss profile(s): `NH`, `MildHL`, `ModHL`, `SevHL` | NH only |
 | `-n, --files-per-category` | Number of files per category | 1 |
 | `-o, --output-dir` | Output directory | Current directory |
+| `--format` | Audio file format for assessment stimuli: `wav`, `flac`, `ogg`, `mp4` | wav |
 | `--prefix` | Prefix for generated filenames | None |
 | `--random-names` | Use random filenames instead of descriptive names | False |
+| `-q, --quiet` | Suppress progress output for assessment stimuli | False |
 | `--loud` | Loudness scaling factor | 0.1 |
 | `-d, --duration` | Duration of each file in seconds | 3600 (1 hour) |
 
@@ -203,6 +206,9 @@ python tinnitus_sound_therapy.py --mod-band FB5 --hearing-profile SevHL -d 30  #
 # Clinical scenario: Patient has 4 kHz tinnitus but high-frequency hearing loss
 python tinnitus_sound_therapy.py -f 4000 -m amp                     # Auto-selects FB4-FB5 (2828-5657 Hz)
 python tinnitus_sound_therapy.py --mod-band FB3 -m amp              # Manual override to FB3-FB4 (2000-4000 Hz)
+
+# Generate hearing assessment stimuli for frequency estimation
+python tinnitus_sound_therapy.py --assessment-stimuli               # Generate all 8 assessment files
 ```
 
 #### Output Files
@@ -214,26 +220,28 @@ Examples:
 - `noise_FB5_MildHL_2.wav` - Noise modulation, FB5-FB6 bands, Mild Hearing Loss
 - `phase_FB7_SevHL_1.wav` - Phase modulation, FB7-FB8 bands, Severe Hearing Loss
 
-### 2. Hearing Assessment Stimuli (`hearing_assessment_stimuli.py`)
+### 2. Hearing Assessment Stimuli (`--assessment-stimuli`)
 
-This tool generates stimuli for hearing assessment and tinnitus frequency estimation.
+The main CLI tool can also generate stimuli for hearing assessment and tinnitus frequency estimation using the `--assessment-stimuli` option.
 
 #### Basic Usage
 
 ```bash
 # Generate all 8 hearing assessment files
-python hearing_assessment_stimuli.py
+python tinnitus_sound_therapy.py --assessment-stimuli
 
 # Using uv
-uv run python hearing_assessment_stimuli.py
+uv run python tinnitus_sound_therapy.py --assessment-stimuli
 ```
 
-#### CLI Options
+#### Additional Options for Assessment Stimuli
+
+When using `--assessment-stimuli`, these additional options are available:
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-o, --output-dir` | Output directory | Current directory |
-| `-f, --format` | Audio format: `wav`, `flac`, `ogg`, `mp4`* | wav |
+| `--format` | Audio format: `wav`, `flac`, `ogg`, `mp4`* | wav |
 | `-q, --quiet` | Suppress progress output | False |
 
 *Note: MP4 format is automatically converted to WAV due to library limitations.
@@ -242,16 +250,16 @@ uv run python hearing_assessment_stimuli.py
 
 ```bash
 # Generate in current directory
-python hearing_assessment_stimuli.py
+python tinnitus_sound_therapy.py --assessment-stimuli
 
 # Generate in specific directory
-python hearing_assessment_stimuli.py -o hearing_tests
+python tinnitus_sound_therapy.py --assessment-stimuli -o hearing_tests
 
 # Generate FLAC files quietly
-python hearing_assessment_stimuli.py -f flac --quiet
+python tinnitus_sound_therapy.py --assessment-stimuli --format flac -q
 
-# Generate with progress output
-python hearing_assessment_stimuli.py -o assessment_stimuli
+# Generate with progress output in specific directory
+python tinnitus_sound_therapy.py --assessment-stimuli -o assessment_stimuli
 ```
 
 #### Output Files
