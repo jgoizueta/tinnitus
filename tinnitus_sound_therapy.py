@@ -667,8 +667,12 @@ def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int 
     print("Full experimental stimuli generation completed!")
 
 
+def frequencies(step_in_octaves: float) -> List[float]:
+    return 1000 * (2 ** np.arange(0.0, 4.0 + step_in_octaves, step_in_octaves))  # 1-16 kHz
+
+
 def band_separation_frequencies() -> List[float]:
-    return 1000 * (2 ** np.arange(0, 4.5, 0.5))  # 1-16 kHz in 1/4 octave steps
+    return frequencies(0.5)  # 1-16 kHz in 1/2 octave steps
 
 
 def frequency_bands(fb: List[float]) -> List[List[float]]:
@@ -732,7 +736,7 @@ def generate_hearing_assessment_stimuli(output_dir: str = ".",
     # Parameters from MatLab implementation
     rms = 0.01
     srate = 44100
-    fhz = band_separation_frequencies()
+    fhz = frequencies(0.25)  # 1-16 kHz in 1/4 octave steps
     bw = 0.5  # Bandwidth (oct) of NBN stimuli
     ramp = 10  # Ramp duration (ms)
     stim_dur = 1  # Duration of each stimulus (s)
