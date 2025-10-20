@@ -347,7 +347,7 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
                                       file_number: int = 1, loud: float = 0.1,
                                       output_dir: str = ".", randnames: bool = False,
                                       name_key_file: str = 'Random_File_Names_Key',
-                                      duration_seconds: float = 3600) -> str:
+                                      duration_seconds: float = 3600, show_progress: bool = True) -> str:
     """
     Generate a single experimental stimulus file for specific parameters
 
@@ -361,6 +361,7 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
         randnames: whether to use random file names (default: False)
         name_key_file: filename for the randomization key
         duration_seconds: total duration of generated file in seconds (default: 3600 = 1 hour)
+        show_progress: whether to show progress bar during generation (default: True)
 
     Returns:
         filepath of generated file
@@ -368,6 +369,7 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
     William Sedley - Last updated September 2024
     """
     import os
+    from tqdm import tqdm
 
     # Validate inputs
     valid_mod_types = ['noise', 'amp', 'phase']
@@ -420,7 +422,14 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
 
     # Generate stimulus sequence
     stim = []
-    for s in range(n_per_file):
+    duration_min = duration_seconds / 60
+
+    # Create progress bar if requested
+    iterator = range(n_per_file)
+    if show_progress:
+        iterator = tqdm(iterator, desc=f"Generating {mod_type} stimuli", unit="stimulus")
+
+    for s in iterator:
         dur_tmp = np.round(10 * (min(dur_range) + np.random.rand() * np.diff(dur_range)[0])) / 10
         f0_tmp = int(np.round(min(f0_range) + np.random.rand() * np.diff(f0_range)[0]))
         fband_db = hl_corr_temp_fbands * hl_corr_vals[hearing_profile]
@@ -517,7 +526,8 @@ def generate_full_experiment_stimuli_updated(loud: float = 0.1, files_per_catego
                             loud=loud,
                             output_dir=".",  # Current directory
                             randnames=randnames,
-                            name_key_file=name_key_file
+                            name_key_file=name_key_file,
+                            show_progress=False  # Disable progress bar when called in batch
                         )
 
                         if randnames:
@@ -916,6 +926,10 @@ def generate_cli_stimuli(frequency_hz: Optional[float] = None,
                 for file_num in range(1, files_per_category + 1):
                     try:
                         # Generate the stimulus
+                        # Check if we're generating multiple files (disable inner progress bar)
+                        show_inner_progress = (len(band_indices) == 1 and len(mod_types) == 1 and
+                                             len(hearing_profiles) == 1 and files_per_category == 1)
+
                         filepath = generate_single_experiment_stimulus(
                             mod_type=mod_type,
                             fband_index=band_idx,
@@ -924,7 +938,8 @@ def generate_cli_stimuli(frequency_hz: Optional[float] = None,
                             loud=loud,
                             output_dir=output_dir,
                             randnames=randnames,
-                            duration_seconds=duration_seconds
+                            duration_seconds=duration_seconds,
+                            show_progress=show_inner_progress
                         )
 
                         # Apply file prefix if specified

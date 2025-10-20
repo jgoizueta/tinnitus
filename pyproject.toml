@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "tinnitus-sound-therapy"
 version = "1.0.0"
 description = "Python port of MatLab tinnitus sound therapy implementation for generating spectral ripple modulated sounds"
-readme = "README_Python_Port.md"
+readme = "README.md"
 license = {text = "CC BY-NC-SA 4.0"}
 authors = [
     {name = "Python Port", email = "noreply@example.com"},
@@ -33,6 +33,7 @@ dependencies = [
     "numpy>=1.21.0",
     "soundfile>=0.10.0",
     "scipy>=1.7.0",
+    "tqdm>=4.64.0",
 ]
 
 [project.optional-dependencies]
