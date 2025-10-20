@@ -17,6 +17,17 @@ The Python program `tinnitus_sound_therapy.py` provides a comprehensive CLI tool
 * **Therapeutic stimuli**: Based on the original `Generate_Full_Experiment_Stimuli` MatLab implementation, generating the full set of experimental files or specific files for given tinnitus frequency, hearing loss, etc.
 * **Hearing assessment stimuli**: Based on the original `Hearing_Tin_Stim_Generation.m` MatLab file, generating files for assessment of tinnitus frequency and hearing loss slope.
 
+## ⚠️ Disclaimer
+
+**This software is provided for research and educational purposes only.**
+
+- **No claims are made regarding the accuracy of reproducing the original study stimuli.** While this implementation aims to follow the original MatLab code, differences in implementation, numerical precision, libraries, and algorithms may result in variations from the original stimuli.
+
+- **No claims are made regarding the therapeutic effectiveness or safety of the generated audio stimuli.** This software is not intended for medical treatment or clinical use.
+
+- **Use at your own risk.** Users assume full responsibility for any use of this software and the generated audio files. Consult with qualified healthcare professionals before using any audio therapy for tinnitus or hearing-related conditions.
+
+- **This is an independent implementation** and is not affiliated with or endorsed by the original researchers or their institutions.
 
 ## Installation
 
