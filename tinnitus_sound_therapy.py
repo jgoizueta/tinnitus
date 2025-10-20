@@ -467,7 +467,7 @@ def generate_single_experiment_stimulus(mod_type: str, fband_index: int, hearing
     return filepath
 
 
-def generate_full_experiment_stimuli_updated(loud: float = 0.1, files_per_category: int = 1,
+def generate_full_experiment_stimuli(loud: float = 0.1, files_per_category: int = 1,
                                            randnames: bool = False, name_key_file: str = 'Random_File_Names_Key') -> None:
     """
     Generate full set of experimental stimuli used in online tinnitus modulation study
@@ -634,7 +634,7 @@ def generate_cli_stimuli(frequency_hz: Optional[float] = None,
 
     if generate_all:
         print("Generating full experimental stimulus set...")
-        generate_full_experiment_stimuli_updated(
+        generate_full_experiment_stimuli(
             loud=loud,
             files_per_category=files_per_category,
             randnames=randnames,
