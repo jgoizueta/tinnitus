@@ -270,7 +270,7 @@ def mod_ripple(f0: float, rand_phase: int, dur: float, loud: float, ramp: float,
     fn = np.array(fn)
     fmod = np.array(fmod)
     fintens = np.array(fintens)
-    fi = fn * f0  # Frequency of harmonics
+    fi = fn * float(f0)  # Frequency of harmonics
 
     if normfreq:  # 1/f intensity scaling of harmonics
         fintens = fintens / fi
